@@ -1,0 +1,22 @@
+# 环境
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+.env
+venv/
+node_modules/
+.DS_Store
+
+# 数据库
+*.db
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 日志
+*.log
