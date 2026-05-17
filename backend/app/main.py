@@ -174,7 +174,7 @@ app.add_middleware(StripTrailingSlashMiddleware)
 
 # ========== 注册路由 ==========
 
-from app.routers import auth, departments, users, courses, exams, tasks, certificates
+from app.routers import auth, departments, users, courses, exams, tasks, certificates, uploads, system, fetch_url, learning_paths, progress, dashboard, enterprise, reviews, notifications, bookmarks, knowledge_graph, reports
 
 app.include_router(auth.router)
 app.include_router(departments.router)
@@ -183,12 +183,31 @@ app.include_router(courses.router)
 app.include_router(exams.router)
 app.include_router(tasks.router)
 app.include_router(certificates.router)
+app.include_router(uploads.router)
+app.include_router(system.router)
+app.include_router(fetch_url.router)
+app.include_router(learning_paths.router)
+app.include_router(progress.router)
+app.include_router(dashboard.router)
+app.include_router(enterprise.router)
+app.include_router(reviews.router)
+app.include_router(notifications.router)
+app.include_router(bookmarks.router)
+app.include_router(knowledge_graph.router)
+app.include_router(reports.router)
 
 
 # ========== 根路径 ==========
 
 @app.get("/")
 async def root():
+    # 前端构建目录: project_root/frontend/dist
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    frontend_dist = os.path.join(project_root, "frontend", "dist")
+    index_path = os.path.join(frontend_dist, "index.html")
+    if os.path.exists(index_path):
+        from starlette.responses import FileResponse
+        return FileResponse(index_path)
     return {
         "应用名称": settings.APP_NAME,
         "版本": settings.APP_VERSION,
@@ -206,3 +225,34 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "message": "服务运行正常"}
+
+
+# ========== 静态文件（前端编译产物） - 放在最后，API路由优先 ==========
+
+from fastapi.staticfiles import StaticFiles
+from starlette.responses import FileResponse
+
+# 前端构建目录: project_root/frontend/dist
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+frontend_dist = os.path.join(project_root, "frontend", "dist")
+if os.path.exists(frontend_dist):
+    # assets目录直接挂载
+    assets_dir = os.path.join(frontend_dist, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend_assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        # 不拦截API路径
+        if full_path.startswith("api/"):
+            from fastapi.responses import JSONResponse
+            return JSONResponse({"detail": "Not Found"}, status_code=404)
+        file_path = os.path.join(frontend_dist, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        # SPA fallback - 所有非API路径返回index.html
+        index_path = os.path.join(frontend_dist, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"detail": "Not Found"}, status_code=404)

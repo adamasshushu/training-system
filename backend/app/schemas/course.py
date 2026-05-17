@@ -234,6 +234,8 @@ class CourseProgressUpdate(BaseModel):
     课时ID: int = Field(..., alias="lesson_id")
     进度: float = Field(0, alias="progress", ge=0, le=100)
     是否完成: bool = Field(False, alias="completed")
+    视频位置: int = Field(0, alias="video_position", ge=0, description="视频播放位置(秒)")
+    视频总时长: int = Field(0, alias="total_duration", ge=0, description="视频总时长(秒)")
 
     class Config:
         populate_by_name = True

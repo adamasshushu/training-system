@@ -75,4 +75,6 @@ class CourseProgress(Base):
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=False)
     progress = Column(Float, default=0, comment="进度 0-100")
     completed = Column(Boolean, default=False)
+    video_position = Column(Integer, default=0, comment="视频播放进度(秒)")
+    total_duration = Column(Integer, default=0, comment="视频总时长(秒)")
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

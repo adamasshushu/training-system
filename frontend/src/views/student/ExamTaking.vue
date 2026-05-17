@@ -34,7 +34,7 @@
               @click="selectChoice(opt.标签)">
               <el-icon class="option-icon">
                 <CircleCheck v-if="isSelected(opt.标签)" color="#409EFF" />
-                <Circle v-else />
+                <span class="circle-empty" />
               </el-icon>
               <span class="option-label">{{ opt.标签 }}.</span>
               <span>{{ opt.内容 }}</span>
@@ -44,11 +44,11 @@
           <!-- 判断题 -->
           <div v-else-if="currentQuestion.题型 === 'judge'" class="options">
             <div class="option" :class="{ selected: currentAnswer === 'A' }" @click="selectAnswer('A')">
-              <el-icon class="option-icon"><CircleCheck v-if="currentAnswer === 'A'" color="#67C23A" /><Circle v-else /></el-icon>
+              <el-icon class="option-icon"><CircleCheck v-if="currentAnswer === 'A'" color="#67C23A" /><span class="circle-empty" v-else /></el-icon>
               <span>✅ 正确</span>
             </div>
             <div class="option" :class="{ selected: currentAnswer === 'B' }" @click="selectAnswer('B')">
-              <el-icon class="option-icon"><CircleCheck v-if="currentAnswer === 'B'" color="#F56C6C" /><Circle v-else /></el-icon>
+              <el-icon class="option-icon"><CircleCheck v-if="currentAnswer === 'B'" color="#F56C6C" /><span class="circle-empty" v-else /></el-icon>
               <span>❌ 错误</span>
             </div>
           </div>
@@ -127,7 +127,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Timer, CircleCheck, Circle, ArrowLeft, ArrowRight, Select } from '@element-plus/icons-vue'
+import { Timer, CircleCheck, ArrowLeft, ArrowRight, Select } from '@element-plus/icons-vue'
 import { getExamDetail, submitExam } from '@/api/exams'
 
 const route = useRoute()
@@ -286,4 +286,5 @@ onUnmounted(() => clearInterval(timer))
 .legend-dot.answered { background: #ecf5ff; border-color: #409EFF; }
 .result-page { padding: 60px 0; text-align: center; }
 .result-score { margin: 16px 0; }
+.circle-empty { display: inline-block; width: 14px; height: 14px; border: 2px solid #c0c4cc; border-radius: 50%; }
 </style>

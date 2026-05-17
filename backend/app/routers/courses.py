@@ -460,10 +460,43 @@ async def update_progress(
         db.add(progress)
     progress.progress = req.进度
     progress.completed = req.是否完成
+    if req.视频位置 > 0:
+        progress.video_position = req.视频位置
+    if req.视频总时长 > 0:
+        progress.total_duration = req.视频总时长
     await db.flush()
     return {
         "message": "进度已更新",
         "进度": progress.progress,
         "是否完成": progress.completed,
-        "labels": {"message": "消息", "进度": "progress", "是否完成": "completed"}
+        "视频位置": progress.video_position,
+        "视频总时长": progress.total_duration,
+        "labels": {"message": "消息", "进度": "progress", "是否完成": "completed",
+                   "视频位置": "video_position", "视频总时长": "total_duration"}
+    }
+
+
+@router.get("/courses/{course_id}/progress/{lesson_id}")
+async def get_lesson_progress(
+    course_id: int,
+    lesson_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """获取课时学习进度（含视频播放位置）"""
+    result = await db.execute(
+        select(CourseProgress).where(
+            CourseProgress.user_id == current_user["id"],
+            CourseProgress.lesson_id == lesson_id,
+            CourseProgress.course_id == course_id,
+        )
+    )
+    progress = result.scalar_one_or_none()
+    if not progress:
+        return {"进度": 0, "是否完成": False, "视频位置": 0, "视频总时长": 0}
+    return {
+        "进度": progress.progress,
+        "是否完成": progress.completed,
+        "视频位置": progress.video_position,
+        "视频总时长": progress.total_duration,
     }

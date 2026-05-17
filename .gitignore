@@ -12,6 +12,13 @@ node_modules/
 *.db
 *.sqlite3
 
+# 证书
+*.pem
+
+# 上传文件
+uploads/
+_storage/
+
 # IDE
 .vscode/
 .idea/

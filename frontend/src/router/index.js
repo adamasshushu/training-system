@@ -62,6 +62,18 @@ const routes = [
         meta: { title: '培训任务' }
       },
       {
+        path: 'learning-paths',
+        name: 'AdminLearningPaths',
+        component: () => import('@/views/admin/LearningPaths.vue'),
+        meta: { title: '学习路径' }
+      },
+      {
+        path: 'progress',
+        name: 'AdminProgress',
+        component: () => import('@/views/admin/ProgressDashboard.vue'),
+        meta: { title: '学习进度' }
+      },
+      {
         path: 'certificates',
         name: 'AdminCertificates',
         component: () => import('@/views/admin/Certificates.vue'),
@@ -72,7 +84,56 @@ const routes = [
         name: 'AdminCertificateTemplates',
         component: () => import('@/views/admin/CertificateTemplates.vue'),
         meta: { title: '证书模板' }
-      }
+      },
+      // ===== Phase 1 New Routes =====
+      {
+        path: 'files',
+        name: 'AdminFiles',
+        component: () => import('@/views/admin/FileManager.vue'),
+        meta: { title: '文件管理' }
+      },
+      {
+        path: 'online-editor',
+        name: 'AdminOnlineEditor',
+        component: () => import('@/views/admin/OnlineEditor.vue'),
+        meta: { title: '在线编辑' }
+      },
+      {
+        path: 'fetch-url',
+        name: 'AdminFetchUrl',
+        component: () => import('@/views/admin/FetchUrl.vue'),
+        meta: { title: '网址抓取' }
+      },
+      {
+        path: 'system-settings',
+        name: 'AdminSystemSettings',
+        component: () => import('@/views/admin/SystemSettings.vue'),
+        meta: { title: '系统设置' }
+      },
+      {
+        path: 'enterprise',
+        name: 'AdminEnterprise',
+        component: () => import('@/views/admin/EnterpriseSettings.vue'),
+        meta: { title: '企业平台' }
+      },
+      {
+        path: 'feedback-manage',
+        name: 'AdminFeedbackManage',
+        component: () => import('@/views/admin/FeedbackManage.vue'),
+        meta: { title: '反馈管理' }
+      },
+      {
+        path: 'reports',
+        name: 'AdminReports',
+        component: () => import('@/views/admin/ReportExport.vue'),
+        meta: { title: '报告导出' }
+      },
+      {
+        path: 'knowledge-graph',
+        name: 'AdminKnowledgeGraph',
+        component: () => import('@/views/student/KnowledgeGraph.vue'),
+        meta: { title: '知识图谱' }
+      },
     ]
   },
   {
@@ -128,7 +189,31 @@ const routes = [
         name: 'StudentTasks',
         component: () => import('@/views/student/Tasks.vue'),
         meta: { title: '我的任务' }
-      }
+      },
+      {
+        path: 'notifications',
+        name: 'StudentNotifications',
+        component: () => import('@/views/student/Notifications.vue'),
+        meta: { title: '通知中心' }
+      },
+      {
+        path: 'feedback',
+        name: 'StudentFeedback',
+        component: () => import('@/views/student/Feedback.vue'),
+        meta: { title: '评价反馈' }
+      },
+      {
+        path: 'bookmarks',
+        name: 'StudentBookmarks',
+        component: () => import('@/views/student/Bookmarks.vue'),
+        meta: { title: '我的收藏' }
+      },
+      {
+        path: 'knowledge-graph',
+        name: 'StudentKnowledgeGraph',
+        component: () => import('@/views/student/KnowledgeGraph.vue'),
+        meta: { title: '知识图谱' }
+      },
     ]
   },
   {

@@ -3,10 +3,11 @@
     <div class="login-card">
       <div class="login-header">
         <div class="logo">
-          <el-icon :size="36" color="#409EFF"><School /></el-icon>
+          <img v-if="branding.logo_url" :src="branding.logo_url" class="logo-img" />
+          <el-icon v-else :size="36" color="#409EFF"><School /></el-icon>
         </div>
-        <h2 class="login-title">培训管理系统</h2>
-        <p class="login-subtitle">企业内部培训管理平台</p>
+        <h2 class="login-title">{{ branding.system_name }}</h2>
+        <p class="login-subtitle">{{ branding.login_tagline }}</p>
       </div>
 
       <el-form
@@ -47,7 +48,7 @@
         </el-form-item>
 
         <div class="login-footer">
-          <span class="hint-text">演示账号：admin / 123456</span>
+          <span class="hint-text">演示账号：admin / admin123</span>
         </div>
       </el-form>
     </div>
@@ -55,15 +56,15 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { User, Lock, School } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { login } from '@/api/auth'
 import { setToken, setUser } from '@/utils/auth'
+import axios from 'axios'
 
 const router = useRouter()
-const route = useRoute()
 const formRef = ref(null)
 const loading = ref(false)
 
@@ -82,6 +83,25 @@ const loginRules = {
   ]
 }
 
+// 品牌配置（动态从后端加载）
+const branding = reactive({
+  logo_url: '',
+  system_name: '培训管理系统',
+  login_tagline: '企业内部培训管理平台'
+})
+
+const loadBranding = async () => {
+  try {
+    const res = await axios.get('/api/system/branding/public')
+    const data = res.data.数据 || {}
+    branding.logo_url = data.Logo地址 || ''
+    branding.system_name = data.系统名称 || '培训管理系统'
+    branding.login_tagline = data.登录页标语 || '企业内部培训管理平台'
+  } catch {
+    // 使用默认值
+  }
+}
+
 const handleLogin = async () => {
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
@@ -90,13 +110,11 @@ const handleLogin = async () => {
   try {
     const res = await login(loginForm)
     setToken(res.access_token)
-    // 保存用户信息用于后续角色判断
     if (res.用户信息) {
       setUser(res.用户信息)
     }
     ElMessage.success('登录成功')
 
-    // 根据角色跳转
     const role = res.用户信息?.角色
     const redirect = role === 'admin' || role === 'teacher'
       ? '/admin/dashboard'
@@ -108,6 +126,8 @@ const handleLogin = async () => {
     loading.value = false
   }
 }
+
+onMounted(loadBranding)
 </script>
 
 <style scoped>
@@ -134,6 +154,13 @@ const handleLogin = async () => {
 
 .logo {
   margin-bottom: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.logo-img {
+  max-width: 80px;
+  max-height: 80px;
 }
 
 .login-title {

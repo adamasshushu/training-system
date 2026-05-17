@@ -14,16 +14,42 @@ router = APIRouter(prefix="/api/auth", tags=["认证"])
 
 @router.post("/login", response_model=LoginResponse)
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
-    """用户登录，返回JWT令牌"""
+    """用户登录，支持LDAP SSO或本地密码"""
     result = await db.execute(
         select(User).where(User.username == req.用户名)
     )
     user = result.scalar_one_or_none()
+
     if not user or not verify_password(req.密码, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="用户名或密码错误",
-        )
+        # 尝试LDAP认证（如果配置了）
+        from app.utils.ldap_auth import ldap_authenticate
+        ldap_info = await ldap_authenticate(req.用户名, req.密码)
+        if ldap_info and not user:
+            # LDAP认证成功，但用户不存在 → 自动创建
+            user = User(
+                username=ldap_info["username"],
+                real_name=ldap_info.get("real_name", req.用户名),
+                email=ldap_info.get("email"),
+                phone=ldap_info.get("phone"),
+                password_hash=get_password_hash(req.密码),
+                role="student",
+                is_active=True,
+            )
+            db.add(user)
+            await db.flush()
+        elif ldap_info and user:
+            # LDAP认证成功，更新用户信息
+            if ldap_info.get("real_name"):
+                user.real_name = ldap_info["real_name"]
+            if ldap_info.get("email"):
+                user.email = ldap_info["email"]
+            await db.flush()
+        elif not ldap_info:
+            # 本地密码和LDAP都失败
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="用户名或密码错误",
+            )
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

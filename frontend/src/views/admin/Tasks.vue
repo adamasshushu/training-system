@@ -124,7 +124,6 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTasks, getTaskDetail, createTask, updateTask, deleteTask, assignTask, removeAssignment } from '@/api/tasks'
 import { getCourses } from '@/api/courses'
 import { getExams } from '@/api/exams'
-import { getUsers } from '@/api/auth'
 import request from '@/api/index'
 
 const loading = ref(false)

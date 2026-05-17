@@ -27,5 +27,5 @@ async def get_db():
 async def init_db():
     """初始化数据库表"""
     async with engine.begin() as conn:
-        from app.models import department, user, course, exam, task, certificate  # noqa
+        from app.models import department, user, course, exam, task, certificate, file, system_settings, learning_path, enterprise, review, notification, bookmark  # noqa
         await conn.run_sync(Base.metadata.create_all)
