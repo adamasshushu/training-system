@@ -6,11 +6,12 @@
     </div>
 
     <!-- 甘特图看板 -->
-    <el-card class="section-card">
+    <el-card shadow="never" class="section-card">
       <template #header>
         <div class="card-header">
-          <span>📋 我的学习时间线</span>
-          <el-tag type="info" size="small">{{ timelineItems.length }} 项</el-tag>
+          <span class="card-header-icon">📋</span>
+          <span>我的学习时间线</span>
+          <el-tag class="card-tag" size="small">{{ timelineItems.length }} 项</el-tag>
         </div>
       </template>
 
@@ -73,10 +74,11 @@
     </el-card>
 
     <!-- 学习路径 -->
-    <el-card class="section-card" style="margin-top: 16px">
+    <el-card shadow="never" class="section-card" style="margin-top: 16px">
       <template #header>
         <div class="card-header">
-          <span>🗺️ 我的学习路径</span>
+          <span class="card-header-icon">🗺️</span>
+          <span>我的学习路径</span>
         </div>
       </template>
 
@@ -94,7 +96,7 @@
           </div>
           <p class="path-desc">{{ path.描述 }}</p>
           <div class="path-progress">
-            <el-progress :percentage="path.总进度" :stroke-width="12" />
+            <el-progress :percentage="path.总进度" :stroke-width="12" :color="path.总进度 >= 100 ? '#10b981' : '#6C5CE7'" />
           </div>
           <div class="path-meta">
             <span>{{ path.已完成课程 }}/{{ path.总课程数 }} 课程</span>
@@ -149,23 +151,37 @@ onMounted(loadDashboard)
 .dashboard-header h2 {
   margin: 0;
   font-size: 22px;
-  color: #303133;
+  color: #1a1a2e;
+  font-weight: 700;
 }
 .subtitle {
   margin: 4px 0 0;
   font-size: 14px;
-  color: #909399;
+  color: #94a3b8;
 }
+
+.section-card {
+  border-radius: 12px;
+}
+
 .card-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
+}
+
+.card-header-icon {
+  font-size: 18px;
+}
+
+.card-tag {
+  margin-left: auto;
 }
 
 /* Gantt Chart */
 .gantt-chart {
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
   overflow: hidden;
 }
 .gantt-header, .gantt-row {
@@ -176,9 +192,9 @@ onMounted(loadDashboard)
   padding: 12px 16px;
 }
 .gantt-header {
-  background: #f5f7fa;
+  background: #f8f9ff;
   font-size: 13px;
-  color: #909399;
+  color: #94a3b8;
   font-weight: 600;
 }
 .gantt-row {
@@ -186,17 +202,17 @@ onMounted(loadDashboard)
   transition: background 0.2s;
 }
 .gantt-row:hover {
-  background: #f5faff;
+  background: #f8f9ff;
 }
 .item-title {
   font-size: 14px;
-  color: #303133;
+  color: #1a1a2e;
   font-weight: 500;
 }
 .progress-bar-wrapper {
   width: 100%;
   height: 20px;
-  background: #f0f0f0;
+  background: #f1f5f9;
   border-radius: 10px;
   overflow: hidden;
 }
@@ -212,7 +228,7 @@ onMounted(loadDashboard)
 }
 .deadline-text {
   font-size: 13px;
-  color: #606266;
+  color: #475569;
 }
 .no-deadline {
   color: #c0c4cc;
@@ -227,9 +243,13 @@ onMounted(loadDashboard)
 }
 .path-card {
   cursor: pointer;
+  border: 1px solid #e2e8f0;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .path-card:hover {
-  border-color: #409EFF;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(108,92,231,0.08);
+  border-color: #c4bdf7;
 }
 .path-header {
   display: flex;
@@ -240,11 +260,11 @@ onMounted(loadDashboard)
 .path-header h3 {
   margin: 0;
   font-size: 16px;
-  color: #303133;
+  color: #1a1a2e;
 }
 .path-desc {
   font-size: 13px;
-  color: #909399;
+  color: #94a3b8;
   margin: 0 0 12px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -256,7 +276,7 @@ onMounted(loadDashboard)
 }
 .path-meta {
   font-size: 12px;
-  color: #909399;
+  color: #94a3b8;
 }
 .empty-state {
   display: flex;

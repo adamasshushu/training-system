@@ -9,13 +9,26 @@
           <Expand v-else-if="!isMobile" />
           <Operation v-else />
         </el-icon>
+        <div class="brand-logo">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <rect width="28" height="28" rx="7" fill="url(#brand-grad)" />
+            <path d="M8 17V11l6-3.5 6 3.5v6l-6 3.5L8 17z" stroke="white" stroke-width="1.5" fill="rgba(255,255,255,0.12)"/>
+            <path d="M14 13v4.5m-2.5-2.25h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+            <defs>
+              <linearGradient id="brand-grad" x1="0" y1="0" x2="28" y2="28">
+                <stop stop-color="#6C5CE7"/>
+                <stop offset="1" stop-color="#a29bfe"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
         <span class="system-title">培训管理系统</span>
       </div>
       <div class="header-right">
         <el-dropdown trigger="click">
           <span class="user-info">
-            <el-avatar :size="32" icon="UserFilled" />
-            <span class="username">管理员</span>
+            <el-avatar :size="32" icon="UserFilled" class="user-avatar" />
+            <span class="username">{{ username }}</span>
             <el-icon><ArrowDown /></el-icon>
           </span>
           <template #dropdown>
@@ -29,7 +42,7 @@
 
     <el-container class="admin-body">
       <!-- 桌面端侧边栏 -->
-      <el-aside v-if="!isMobile" :width="isCollapsed ? '64px' : '220px'" class="admin-sidebar">
+      <el-aside v-if="!isMobile" :width="isCollapsed ? '64px' : '230px'" class="admin-sidebar">
         <side-menu :is-collapsed="isCollapsed" />
       </el-aside>
 
@@ -49,7 +62,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { removeToken } from '@/utils/auth'
+import { removeToken, getUser } from '@/utils/auth'
 import { ElMessageBox } from 'element-plus'
 import SideMenu from './SideMenu.vue'
 
@@ -58,6 +71,8 @@ const router = useRouter()
 const isCollapsed = ref(false)
 const drawerVisible = ref(false)
 const isMobile = ref(window.innerWidth < 768)
+const userInfo = ref(getUser() || {})
+const username = computed(() => userInfo.value?.真实姓名 || userInfo.value?.real_name || '管理员')
 
 const checkMobile = () => {
   isMobile.value = window.innerWidth < 768
@@ -90,10 +105,10 @@ const handleLogout = async () => {
   align-items: center;
   justify-content: space-between;
   height: 60px;
-  padding: 0 16px;
+  padding: 0 20px;
   background: #fff;
-  border-bottom: 1px solid #e6e6e6;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   z-index: 10;
 }
 
@@ -103,20 +118,27 @@ const handleLogout = async () => {
   gap: 12px;
 }
 
+.brand-logo {
+  display: flex;
+  align-items: center;
+}
+
 .toggle-btn {
   font-size: 20px;
   cursor: pointer;
-  color: #606266;
+  color: #64748b;
+  transition: color 0.2s;
 }
 .toggle-btn:hover {
-  color: #409EFF;
+  color: #6C5CE7;
 }
 
 .system-title {
   font-size: 18px;
-  font-weight: 600;
-  color: #303133;
+  font-weight: 700;
+  color: #1a1a2e;
   white-space: nowrap;
+  letter-spacing: -0.3px;
 }
 
 .header-right {
@@ -131,22 +153,36 @@ const handleLogout = async () => {
   cursor: pointer;
 }
 
+.user-avatar {
+  background: linear-gradient(135deg, #6C5CE7, #a29bfe);
+}
+
 .username {
   font-size: 14px;
-  color: #606266;
+  color: #475569;
+  font-weight: 500;
 }
 
 .admin-sidebar {
-  background-color: #304156;
-  transition: width 0.3s;
+  background-color: #1a1a2e;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
+  border-right: 1px solid rgba(255,255,255,0.04);
 }
 
 .admin-main {
   background-color: #f0f2f5;
-  padding: 16px;
+  padding: 20px;
   overflow-y: auto;
   height: calc(100vh - 60px);
+}
+
+/* mobile drawer overrides */
+.mobile-drawer :deep(.el-drawer) {
+  background: #1a1a2e;
+}
+.mobile-drawer :deep(.el-drawer__body) {
+  padding: 0;
 }
 
 /* 移动端适配 */

@@ -3,9 +3,9 @@
     :default-active="activeMenu"
     :collapse="isCollapsed"
     :router="true"
-    background-color="#304156"
-    text-color="#bfcbd9"
-    active-text-color="#409EFF"
+    background-color="#1a1a2e"
+    text-color="#a0aec0"
+    active-text-color="#e2e8f0"
     class="sidebar-menu"
   >
     <el-menu-item index="/admin/dashboard">
@@ -86,6 +86,10 @@
         <el-icon><Folder /></el-icon>
         <span>内容管理</span>
       </template>
+      <el-menu-item index="/admin/videos">
+        <el-icon><VideoCameraFilled /></el-icon>
+        <template #title>视频管理</template>
+      </el-menu-item>
       <el-menu-item index="/admin/files">
         <el-icon><Upload /></el-icon>
         <template #title>文件管理</template>
@@ -148,5 +152,56 @@ const handleItemClick = () => {
 .sidebar-menu {
   border-right: none;
   height: 100%;
+  padding-top: 8px;
+}
+
+/* Override Element Plus menu styles for dark sidebar */
+.sidebar-menu :deep(.el-menu-item),
+.sidebar-menu :deep(.el-sub-menu__title) {
+  margin: 2px 8px;
+  padding: 0 12px;
+  border-radius: 8px;
+  height: 44px;
+  line-height: 44px;
+  transition: all 0.2s ease;
+}
+
+.sidebar-menu :deep(.el-menu-item):hover,
+.sidebar-menu :deep(.el-sub-menu__title):hover {
+  background-color: #16213e !important;
+  color: #e2e8f0 !important;
+}
+
+.sidebar-menu :deep(.el-menu-item.is-active) {
+  background: linear-gradient(135deg, rgba(108,92,231,0.2), rgba(162,155,254,0.1)) !important;
+  color: #e2e8f0 !important;
+  font-weight: 600;
+  border-right: 3px solid #6C5CE7;
+}
+
+.sidebar-menu :deep(.el-sub-menu.is-opened > .el-sub-menu__title) {
+  color: #c4bdf7 !important;
+}
+
+.sidebar-menu :deep(.el-menu--inline) {
+  background-color: transparent !important;
+}
+
+.sidebar-menu :deep(.el-menu--inline .el-menu-item) {
+  padding-left: 48px !important;
+  margin: 1px 4px;
+}
+
+/* Icon color */
+.sidebar-menu :deep(.el-icon) {
+  color: inherit;
+}
+
+/* Collapsed mode */
+.sidebar-menu :deep(.el-menu--collapse .el-menu-item) {
+  margin: 2px 8px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 8px;
 }
 </style>

@@ -174,7 +174,7 @@ app.add_middleware(StripTrailingSlashMiddleware)
 
 # ========== 注册路由 ==========
 
-from app.routers import auth, departments, users, courses, exams, tasks, certificates, uploads, system, fetch_url, learning_paths, progress, dashboard, enterprise, reviews, notifications, bookmarks, knowledge_graph, reports
+from app.routers import auth, departments, users, courses, exams, tasks, certificates, uploads, system, fetch_url, learning_paths, progress, dashboard, enterprise, reviews, notifications, bookmarks, knowledge_graph, reports, videos
 
 app.include_router(auth.router)
 app.include_router(departments.router)
@@ -195,6 +195,7 @@ app.include_router(notifications.router)
 app.include_router(bookmarks.router)
 app.include_router(knowledge_graph.router)
 app.include_router(reports.router)
+app.include_router(videos.router)
 
 
 # ========== 根路径 ==========

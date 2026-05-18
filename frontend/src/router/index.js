@@ -87,6 +87,12 @@ const routes = [
       },
       // ===== Phase 1 New Routes =====
       {
+        path: 'videos',
+        name: 'AdminVideos',
+        component: () => import('@/views/admin/Videos.vue'),
+        meta: { title: '视频管理' }
+      },
+      {
         path: 'files',
         name: 'AdminFiles',
         component: () => import('@/views/admin/FileManager.vue'),

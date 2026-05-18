@@ -4,7 +4,19 @@
       <div class="login-header">
         <div class="logo">
           <img v-if="branding.logo_url" :src="branding.logo_url" class="logo-img" />
-          <el-icon v-else :size="36" color="#409EFF"><School /></el-icon>
+          <div v-else class="logo-icon">
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+              <rect width="48" height="48" rx="12" fill="url(#logo-grad)" />
+              <path d="M14 30V18l10-6 10 6v12l-10 6-10-6z" stroke="white" stroke-width="2" fill="rgba(255,255,255,0.15)"/>
+              <path d="M24 22v8m-4-4h8" stroke="white" stroke-width="2" stroke-linecap="round"/>
+              <defs>
+                <linearGradient id="logo-grad" x1="0" y1="0" x2="48" y2="48">
+                  <stop stop-color="#6C5CE7"/>
+                  <stop offset="1" stop-color="#a29bfe"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
         </div>
         <h2 class="login-title">{{ branding.system_name }}</h2>
         <p class="login-subtitle">{{ branding.login_tagline }}</p>
@@ -58,7 +70,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { User, Lock, School } from '@element-plus/icons-vue'
+import { User, Lock } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { login } from '@/api/auth'
 import { setToken, setUser } from '@/utils/auth'
@@ -109,6 +121,8 @@ const handleLogin = async () => {
   loading.value = true
   try {
     const res = await login(loginForm)
+    // Clear any stale data first
+    localStorage.removeItem('training-system-user')
     setToken(res.access_token)
     if (res.用户信息) {
       setUser(res.用户信息)
@@ -136,15 +150,31 @@ onMounted(loadBranding)
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1a1a2e 0%, #2a2166 40%, #6C5CE7 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.login-container::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at 30% 50%, rgba(108,92,231,0.15) 0%, transparent 50%),
+              radial-gradient(circle at 70% 30%, rgba(162,155,254,0.1) 0%, transparent 40%);
+  pointer-events: none;
 }
 
 .login-card {
   width: 420px;
   padding: 40px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 16px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25);
+  position: relative;
+  backdrop-filter: blur(20px);
 }
 
 .login-header {
@@ -163,11 +193,20 @@ onMounted(loadBranding)
   max-height: 80px;
 }
 
+.logo-icon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .login-title {
   font-size: 24px;
-  font-weight: 600;
-  color: #303133;
+  font-weight: 700;
+  color: #1a1a2e;
   margin-bottom: 8px;
+  letter-spacing: -0.3px;
 }
 
 .login-subtitle {
@@ -183,6 +222,8 @@ onMounted(loadBranding)
   width: 100%;
   height: 44px;
   font-size: 16px;
+  font-weight: 600;
+  border-radius: 10px;
 }
 
 .login-footer {
