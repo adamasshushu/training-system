@@ -379,7 +379,7 @@ onMounted(fetchVideos)
 }
 
 .video-card {
-  background: #fff;
+  background: var(--bg-card);
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   overflow: hidden;

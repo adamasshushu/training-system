@@ -3,9 +3,9 @@
     :default-active="activeMenu"
     :collapse="isCollapsed"
     :router="true"
-    background-color="#1a1a2e"
-    text-color="#a0aec0"
-    active-text-color="#e2e8f0"
+    :background-color="sidebarBg"
+    :text-color="sidebarText"
+    :active-text-color="sidebarActiveText"
     class="sidebar-menu"
   >
     <el-menu-item index="/admin/dashboard">
@@ -19,11 +19,9 @@
         <span>组织管理</span>
       </template>
       <el-menu-item index="/admin/departments">
-        <el-icon><FolderOpened /></el-icon>
         <template #title>部门管理</template>
       </el-menu-item>
       <el-menu-item index="/admin/users">
-        <el-icon><User /></el-icon>
         <template #title>员工管理</template>
       </el-menu-item>
     </el-sub-menu>
@@ -34,19 +32,15 @@
         <span>教务管理</span>
       </template>
       <el-menu-item index="/admin/courses">
-        <el-icon><VideoCamera /></el-icon>
         <template #title>课程管理</template>
       </el-menu-item>
       <el-menu-item index="/admin/course-categories">
-        <el-icon><Collection /></el-icon>
         <template #title>课程分类</template>
       </el-menu-item>
       <el-menu-item index="/admin/exams">
-        <el-icon><EditPen /></el-icon>
         <template #title>考试管理</template>
       </el-menu-item>
       <el-menu-item index="/admin/questions">
-        <el-icon><QuestionFilled /></el-icon>
         <template #title>题库管理</template>
       </el-menu-item>
     </el-sub-menu>
@@ -72,11 +66,9 @@
         <span>证书管理</span>
       </template>
       <el-menu-item index="/admin/certificates">
-        <el-icon><Trophy /></el-icon>
         <template #title>证书管理</template>
       </el-menu-item>
       <el-menu-item index="/admin/certificate-templates">
-        <el-icon><CopyDocument /></el-icon>
         <template #title>证书模板</template>
       </el-menu-item>
     </el-sub-menu>
@@ -87,19 +79,15 @@
         <span>内容管理</span>
       </template>
       <el-menu-item index="/admin/videos">
-        <el-icon><VideoCameraFilled /></el-icon>
         <template #title>视频管理</template>
       </el-menu-item>
       <el-menu-item index="/admin/files">
-        <el-icon><Upload /></el-icon>
         <template #title>文件管理</template>
       </el-menu-item>
       <el-menu-item index="/admin/online-editor">
-        <el-icon><Edit /></el-icon>
         <template #title>在线编辑</template>
       </el-menu-item>
       <el-menu-item index="/admin/fetch-url">
-        <el-icon><Link /></el-icon>
         <template #title>网址抓取</template>
       </el-menu-item>
     </el-sub-menu>
@@ -143,6 +131,10 @@ const emit = defineEmits(['click'])
 const route = useRoute()
 const activeMenu = computed(() => route.path)
 
+const sidebarBg = '#1a1a2e'
+const sidebarText = '#a0aec0'
+const sidebarActiveText = '#e2e8f0'
+
 const handleItemClick = () => {
   emit('click')
 }
@@ -153,9 +145,21 @@ const handleItemClick = () => {
   border-right: none;
   height: 100%;
   padding-top: 8px;
+  padding-bottom: 48px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-/* Override Element Plus menu styles for dark sidebar */
+/* Scrollbar */
+.sidebar-menu::-webkit-scrollbar {
+  width: 3px;
+}
+.sidebar-menu::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 10px;
+}
+
+/* Menu items */
 .sidebar-menu :deep(.el-menu-item),
 .sidebar-menu :deep(.el-sub-menu__title) {
   margin: 2px 8px;
@@ -164,6 +168,7 @@ const handleItemClick = () => {
   height: 44px;
   line-height: 44px;
   transition: all 0.2s ease;
+  font-size: 14px;
 }
 
 .sidebar-menu :deep(.el-menu-item):hover,
@@ -176,7 +181,18 @@ const handleItemClick = () => {
   background: linear-gradient(135deg, rgba(108,92,231,0.2), rgba(162,155,254,0.1)) !important;
   color: #e2e8f0 !important;
   font-weight: 600;
-  border-right: 3px solid #6C5CE7;
+  position: relative;
+}
+.sidebar-menu :deep(.el-menu-item.is-active)::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  background: #6C5CE7;
+  border-radius: 0 3px 3px 0;
 }
 
 .sidebar-menu :deep(.el-sub-menu.is-opened > .el-sub-menu__title) {
@@ -188,17 +204,24 @@ const handleItemClick = () => {
 }
 
 .sidebar-menu :deep(.el-menu--inline .el-menu-item) {
-  padding-left: 48px !important;
+  padding-left: 44px !important;
   margin: 1px 4px;
+  font-size: 13px;
 }
 
-/* Icon color */
+/* Icons */
 .sidebar-menu :deep(.el-icon) {
   color: inherit;
 }
 
 /* Collapsed mode */
 .sidebar-menu :deep(.el-menu--collapse .el-menu-item) {
+  margin: 2px 8px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 8px;
+}
+.sidebar-menu :deep(.el-menu--collapse .el-sub-menu__title) {
   margin: 2px 8px;
   padding: 0;
   justify-content: center;

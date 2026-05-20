@@ -239,7 +239,7 @@ onMounted(() => {
 .page-card h2 {
   margin: 0 0 20px;
   font-size: 18px;
-  color: #303133;
+  color: var(--text-primary);
 }
 .settings-form {
   max-width: 700px;
@@ -257,7 +257,7 @@ onMounted(() => {
 .logo-img {
   max-width: 200px;
   max-height: 80px;
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   padding: 4px;
 }

@@ -170,6 +170,6 @@ onMounted(() => { loadTasks(); loadCourses() })
 
 <style scoped>
 .feedback-page { max-width: 800px; margin: 0 auto; }
-.page-desc { font-size: 13px; color: #909399; margin: -12px 0 20px; }
+.page-desc { font-size: 13px; color: var(--text-tertiary); margin: -12px 0 20px; }
 .feedback-form { max-width: 600px; }
 </style>

@@ -32,11 +32,11 @@ onMounted(async () => {
 <style scoped>
 .student-certs { max-width:1200px; margin:0 auto; padding:24px }
 .page-header { margin-bottom:24px }
-.page-header h2 { font-size:24px; font-weight:700; color:#303133 }
+.page-header h2 { font-size:24px; font-weight:700; color:var(--text-primary) }
 .cert-card { text-align:center; padding:24px; border-radius:12px }
 .cert-icon { margin-bottom:12px }
-.cert-card h3 { font-size:18px; font-weight:600; color:#303133; margin-bottom:12px }
-.cert-number { font-size:13px; color:#909399; margin-bottom:4px }
-.cert-name { font-size:15px; color:#606266; margin-bottom:4px }
-.cert-date { font-size:12px; color:#909399 }
+.cert-card h3 { font-size:18px; font-weight:600; color:var(--text-primary); margin-bottom:12px }
+.cert-number { font-size:13px; color:var(--text-tertiary); margin-bottom:4px }
+.cert-name { font-size:15px; color:var(--text-secondary); margin-bottom:4px }
+.cert-date { font-size:12px; color:var(--text-tertiary) }
 </style>

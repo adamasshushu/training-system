@@ -43,7 +43,7 @@
         <span>📋 抓取历史</span>
       </template>
 
-      <el-table :data="history" v-loading="loadingHistory">
+      <el-table :data="history" v-loading="loadingHistory" border stripe>
         <el-table-column prop="ID" label="ID" width="60" />
         <el-table-column label="标题" min-width="250">
           <template #default="{ row }">
@@ -68,8 +68,8 @@
         <el-table-column prop="创建时间" label="抓取时间" width="180" />
         <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link :icon="View" @click="openFile(row)">查看</el-button>
-            <el-button type="primary" link :icon="CopyDocument" @click="copyUrl(row)">复制链接</el-button>
+            <el-button text size="small" type="primary" @click="openFile(row)">查看</el-button>
+            <el-button text size="small" type="primary" @click="copyUrl(row)">复制链接</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -79,7 +79,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Link, View, CopyDocument } from '@element-plus/icons-vue'
+import { Link } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getToken } from '@/utils/auth'
 import axios from 'axios'
@@ -178,11 +178,11 @@ onMounted(loadHistory)
 .page-header h2 {
   margin: 0;
   font-size: 18px;
-  color: #303133;
+  color: var(--text-primary);
 }
 .page-desc {
   font-size: 13px;
-  color: #909399;
+  color: var(--text-tertiary);
   margin-top: 6px;
 }
 .title-cell {
@@ -191,7 +191,7 @@ onMounted(loadHistory)
   gap: 6px;
 }
 .source-link {
-  color: #409EFF;
+  color: var(--text-link);
   text-decoration: none;
   font-size: 13px;
 }

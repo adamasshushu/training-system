@@ -1,50 +1,171 @@
 <template>
   <div class="dashboard">
+    <!-- Page Header -->
     <div class="page-header">
-      <h2 class="page-title">系统概览</h2>
-      <p class="page-subtitle">培训系统数据总览</p>
+      <div>
+        <h2 class="page-title">系统概览</h2>
+        <p class="page-subtitle">欢迎回来，{{ username }}！今天的数据总览</p>
+      </div>
+      <div class="page-actions">
+        <el-button class="action-btn" @click="refreshData" :loading="loading">
+          <el-icon><Refresh /></el-icon>
+          刷新数据
+        </el-button>
+      </div>
     </div>
 
-    <el-row :gutter="20" class="stat-cards" v-loading="loading">
-      <el-col :xs="12" :sm="8" :md="4" v-for="s in statItems" :key="s.label">
-        <el-card shadow="never" class="stat-card" @click="$router.push(s.link)">
-          <div class="stat-content">
-            <div class="stat-info">
-              <div class="stat-label">{{ s.label }}</div>
-              <div class="stat-value">{{ stats[s.key] || 0 }}</div>
+    <!-- Bento Grid Dashboard -->
+    <div class="bento-grid" v-loading="loading">
+      <!-- Card 1: Big stats summary (2x1) -->
+      <div class="bento-card bento-wide stat-summary">
+        <div class="bento-card-header">
+          <span class="bento-card-title">数据概览</span>
+          <el-tag size="small" type="info">实时</el-tag>
+        </div>
+        <div class="stat-cards-row">
+          <div
+            v-for="s in statItems"
+            :key="s.label"
+            class="stat-mini-card"
+            @click="$router.push(s.link)"
+          >
+            <div class="stat-icon" :style="{ background: s.bg, color: s.color }">
+              <el-icon :size="18"><component :is="s.icon" /></el-icon>
             </div>
-            <div class="stat-icon-wrap" :style="{ background: s.bg }">
-              <el-icon class="stat-icon" :color="s.color" :size="22"><component :is="s.icon" /></el-icon>
+            <div class="stat-info">
+              <span class="stat-num">{{ stats[s.key] || 0 }}</span>
+              <span class="stat-label">{{ s.label }}</span>
             </div>
           </div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <el-card shadow="never" class="quick-links-card">
-      <template #header>
-        <div class="card-header">
-          <span class="card-title">⚡ 快速入口</span>
         </div>
-      </template>
-      <el-row :gutter="12">
-        <el-col :span="6" v-for="link in quickLinks" :key="link.path">
-          <el-button class="quick-link-btn" @click="$router.push(link.path)">
-            {{ link.label }}
-          </el-button>
-        </el-col>
-      </el-row>
-    </el-card>
+      </div>
+
+      <!-- Card 2: Quick access (1x1) -->
+      <div class="bento-card quick-access">
+        <div class="bento-card-header">
+          <span class="bento-card-title">⚡ 快速入口</span>
+        </div>
+        <div class="quick-links-grid">
+          <div
+            v-for="link in quickLinks"
+            :key="link.path"
+            class="quick-link-item"
+            @click="$router.push(link.path)"
+          >
+            <el-icon :size="20"><component :is="link.icon" /></el-icon>
+            <span>{{ link.label }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: System status (1x1) -->
+      <div class="bento-card system-status">
+        <div class="bento-card-header">
+          <span class="bento-card-title">系统状态</span>
+        </div>
+        <div class="status-items">
+          <div class="status-item">
+            <span class="status-dot online"></span>
+            <span class="status-label">服务器</span>
+            <el-tag size="small" type="success">运行中</el-tag>
+          </div>
+          <div class="status-item">
+            <span class="status-dot online"></span>
+            <span class="status-label">数据库</span>
+            <el-tag size="small" type="success">正常</el-tag>
+          </div>
+          <div class="status-item">
+            <span class="status-dot online"></span>
+            <span class="status-label">存储服务</span>
+            <el-tag size="small" type="success">正常</el-tag>
+          </div>
+          <div class="status-item">
+            <span class="status-dot online"></span>
+            <span class="status-label">API</span>
+            <el-tag size="small" type="success">正常</el-tag>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4: Recent activity (2x1) -->
+      <div class="bento-card bento-activity">
+        <div class="bento-card-header">
+          <span class="bento-card-title">📋 快捷操作</span>
+        </div>
+        <div class="activity-items">
+          <div class="activity-item" @click="$router.push('/admin/courses')">
+            <div class="activity-icon create">
+              <el-icon><Plus /></el-icon>
+            </div>
+            <div class="activity-info">
+              <span class="activity-title">新建课程</span>
+              <span class="activity-desc">添加新的培训课程</span>
+            </div>
+          </div>
+          <div class="activity-item" @click="$router.push('/admin/exams')">
+            <div class="activity-icon create">
+              <el-icon><EditPen /></el-icon>
+            </div>
+            <div class="activity-info">
+              <span class="activity-title">创建考试</span>
+              <span class="activity-desc">发布新的考核任务</span>
+            </div>
+          </div>
+          <div class="activity-item" @click="$router.push('/admin/users')">
+            <div class="activity-icon manage">
+              <el-icon><User /></el-icon>
+            </div>
+            <div class="activity-info">
+              <span class="activity-title">管理员工</span>
+              <span class="activity-desc">查看和编辑员工信息</span>
+            </div>
+          </div>
+          <div class="activity-item" @click="$router.push('/admin/tasks')">
+            <div class="activity-icon manage">
+              <el-icon><List /></el-icon>
+            </div>
+            <div class="activity-info">
+              <span class="activity-title">分配任务</span>
+              <span class="activity-desc">创建培训任务并分配</span>
+            </div>
+          </div>
+          <div class="activity-item" @click="$router.push('/admin/certificate-templates')">
+            <div class="activity-icon template">
+              <el-icon><CopyDocument /></el-icon>
+            </div>
+            <div class="activity-info">
+              <span class="activity-title">证书模板</span>
+              <span class="activity-desc">管理证书样式模板</span>
+            </div>
+          </div>
+          <div class="activity-item" @click="$router.push('/admin/reports')">
+            <div class="activity-icon template">
+              <el-icon><Download /></el-icon>
+            </div>
+            <div class="activity-info">
+              <span class="activity-title">导出报告</span>
+              <span class="activity-desc">生成培训数据报表</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { Reading, EditPen, User, List, Medal, Trophy } from '@element-plus/icons-vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import {
+  Reading, EditPen, User, List, Medal, Trophy,
+  Plus, Refresh, CopyDocument, Download
+} from '@element-plus/icons-vue'
 import { getStats } from '@/api/certificates'
+import { getUser } from '@/utils/auth'
 
 const loading = ref(false)
 const stats = reactive({})
+const userInfo = ref(getUser() || {})
+const username = computed(() => userInfo.value?.真实姓名 || userInfo.value?.real_name || '管理员')
 
 const statItems = [
   { label:'员工数', key:'员工数量', icon:User, color:'#6C5CE7', bg:'rgba(108,92,231,0.1)', link:'/admin/users' },
@@ -57,122 +178,318 @@ const statItems = [
 ]
 
 const quickLinks = [
-  { label:'题库管理', path:'/admin/questions' },
-  { label:'新建考试', path:'/admin/exams' },
-  { label:'新建任务', path:'/admin/tasks' },
-  { label:'证书模板', path:'/admin/certificate-templates' },
+  { label:'题库管理', path:'/admin/questions', icon:Reading },
+  { label:'新建考试', path:'/admin/exams', icon:EditPen },
+  { label:'新建任务', path:'/admin/tasks', icon:List },
+  { label:'证书模板', path:'/admin/certificate-templates', icon:CopyDocument },
 ]
 
-onMounted(async () => {
+const loadData = async () => {
   loading.value = true
   try {
     const res = await getStats()
     Object.assign(stats, res.数据 || {})
-  } catch {} finally { loading.value = false }
-})
+  } catch {
+    // silent
+  } finally {
+    loading.value = false
+  }
+}
+
+const refreshData = () => {
+  loadData()
+}
+
+onMounted(loadData)
 </script>
 
 <style scoped>
 .dashboard {
   max-width: 1200px;
+  animation: fadeIn 0.3s ease-out;
 }
 
+/* ===== Page Header ===== */
 .page-header {
-  margin-bottom: 24px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
 }
-
 .page-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1a1a2e;
-  margin-bottom: 4px;
-  letter-spacing: -0.3px;
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
 }
-
 .page-subtitle {
-  font-size: 14px;
-  color: #94a3b8;
-  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+.page-actions {
+  display: flex;
+  gap: 8px;
+}
+.action-btn {
+  gap: 6px;
 }
 
-.stat-cards {
-  margin-bottom: 0;
+/* ===== Bento Grid ===== */
+.bento-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
 }
 
-.stat-card {
-  cursor: pointer;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  margin-bottom: 16px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(108,92,231,0.1);
+.bento-wide {
+  grid-column: 1 / -1;
 }
 
-.stat-content {
+.bento-activity {
+  grid-column: 1 / -1;
+}
+
+/* ===== Bento Card ===== */
+.bento-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  transition: all var(--transition-base);
+  box-shadow: var(--shadow-card);
+}
+.bento-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.bento-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+.bento-card-title {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
 }
 
-.stat-info {
-  flex: 1;
+/* ===== Stats Summary (Bento-wide) ===== */
+.stat-cards-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: var(--space-3);
 }
 
-.stat-label {
-  font-size: 13px;
-  color: #94a3b8;
-  margin-bottom: 6px;
-  font-weight: 500;
+.stat-mini-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.stat-mini-card:hover {
+  background: var(--bg-hover);
+  transform: translateY(-1px);
 }
 
-.stat-value {
-  font-size: 28px;
-  font-weight: 700;
-  color: #1a1a2e;
-  letter-spacing: -0.5px;
-}
-
-.stat-icon-wrap {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+.stat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
-.quick-links-card {
-  margin-top: 8px;
+.stat-info {
+  display: flex;
+  flex-direction: column;
+}
+.stat-num {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+}
+.stat-label {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-top: 1px;
 }
 
-.card-header {
+/* ===== Quick Access ===== */
+.quick-links-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.quick-link-item {
   display: flex;
   align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--bg-hover);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+.quick-link-item:hover {
+  background: var(--brand-50);
+  color: var(--brand-500);
+  transform: translateY(-1px);
+}
+html.dark .quick-link-item:hover {
+  background: rgba(108, 92, 231, 0.1);
 }
 
-.card-title {
-  font-weight: 600;
-  font-size: 16px;
-  color: #1a1a2e;
+/* ===== System Status ===== */
+.status-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
-.quick-link-btn {
-  width: 100%;
-  margin-bottom: 8px;
-  background: #f8f9ff !important;
-  border: 1px solid #e2e8f0 !important;
-  color: #475569 !important;
-  font-weight: 500;
-  border-radius: 10px;
-  transition: all 0.2s;
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
 }
-.quick-link-btn:hover {
-  background: #eef0ff !important;
-  border-color: #6C5CE7 !important;
-  color: #6C5CE7 !important;
+.status-item:hover {
+  background: var(--bg-hover);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.online {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.4);
+}
+
+.status-label {
+  flex: 1;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  font-weight: var(--weight-medium);
+}
+
+/* ===== Activity ===== */
+.activity-items {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.activity-item:hover {
+  background: var(--bg-hover);
+  transform: translateY(-1px);
+}
+
+.activity-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #fff;
+}
+.activity-icon.create {
+  background: var(--brand-500);
+}
+.activity-icon.manage {
+  background: #10b981;
+}
+.activity-icon.template {
+  background: #f59e0b;
+}
+
+.activity-info {
+  display: flex;
+  flex-direction: column;
+}
+.activity-title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+.activity-desc {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-top: 1px;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 1024px) {
+  .bento-grid {
+    gap: var(--space-4);
+  }
+  .activity-items {
+    grid-template-columns: 1fr 1fr;
+  }
+  .stat-cards-row {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .page-header {
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  .bento-grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+  .activity-items {
+    grid-template-columns: 1fr;
+  }
+  .quick-links-grid {
+    grid-template-columns: 1fr;
+  }
+  .stat-cards-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .stat-num {
+    font-size: var(--text-xl);
+  }
+}
+
+/* ===== Reduced motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  .dashboard,
+  .bento-card,
+  .stat-mini-card,
+  .quick-link-item,
+  .activity-item {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 </style>

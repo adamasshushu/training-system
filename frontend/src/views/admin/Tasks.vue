@@ -1,47 +1,50 @@
 <template>
   <div class="tasks-page">
-    <div class="page-header">
-      <h2 class="page-title">培训任务</h2>
-      <el-button type="primary" @click="handleAdd"><el-icon><Plus /></el-icon>新建任务</el-button>
-    </div>
+    <AdminTable
+      :data="taskList"
+      :loading="loading"
+      :total="total"
+      v-model:model-value="page"
+      :page-size="20"
+      :columns="columns"
+      :show-search="false"
+      :actions-width="260"
+      :page-sizes="[10, 20, 50]"
+      @current-change="loadData"
+      @size-change="loadData"
+    >
+      <template #page-header>
+        <div class="page-header">
+          <h2 class="page-title">培训任务</h2>
+          <el-button type="primary" @click="handleAdd"><el-icon><Plus /></el-icon>新建任务</el-button>
+        </div>
+      </template>
 
-    <el-card shadow="never">
-      <el-table :data="taskList" border stripe v-loading="loading">
-        <el-table-column type="index" label="#" width="55" />
-        <el-table-column prop="标题" label="任务名称" min-width="200" />
-        <el-table-column label="模式" width="80" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.模式 === 'level' ? 'warning' : 'info'" size="small">
-              {{ row.模式 === 'level' ? '闯关' : '自由' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="内容" width="140" align="center">
-          <template #default="{ row }">{{ row.课程数量 }}课 {{ row.考试数量 }}考</template>
-        </el-table-column>
-        <el-table-column label="状态" width="80" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.是否发布 ? 'success' : 'info'" size="small">
-              {{ row.是否发布 ? '发布' : '草稿' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="创建人姓名" label="创建人" width="90" align="center" />
-        <el-table-column label="操作" width="260" fixed="right">
-          <template #default="{ row }">
-            <el-button text size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
-            <el-button text size="small" type="success" @click="handleAssign(row)">指派</el-button>
-            <el-button text size="small" type="warning" @click="togglePublish(row)">
-              {{ row.是否发布 ? '下架' : '发布' }}
-            </el-button>
-            <el-button text size="small" type="danger" @click="handleDelete(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <el-pagination v-model:current-page="page" :page-size="20" :total="total"
-        layout="total, prev, pager, next" @current-change="loadData"
-        style="margin-top:16px; justify-content:center" />
-    </el-card>
+      <template #column-模式="{ row }">
+        <el-tag :type="row.模式 === 'level' ? 'warning' : 'info'" size="small">
+          {{ row.模式 === 'level' ? '闯关' : '自由' }}
+        </el-tag>
+      </template>
+
+      <template #column-内容="{ row }">
+        {{ row.课程数量 }}课 {{ row.考试数量 }}考
+      </template>
+
+      <template #column-状态="{ row }">
+        <el-tag :type="row.是否发布 ? 'success' : 'info'" size="small">
+          {{ row.是否发布 ? '发布' : '草稿' }}
+        </el-tag>
+      </template>
+
+      <template #actions="{ row }">
+        <el-button text size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
+        <el-button text size="small" type="success" @click="handleAssign(row)">指派</el-button>
+        <el-button text size="small" type="warning" @click="togglePublish(row)">
+          {{ row.是否发布 ? '下架' : '发布' }}
+        </el-button>
+        <el-button text size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+      </template>
+    </AdminTable>
 
     <!-- 新建/编辑任务 -->
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑任务' : '新建任务'" width="750px" destroy-on-close>
@@ -125,12 +128,21 @@ import { getTasks, getTaskDetail, createTask, updateTask, deleteTask, assignTask
 import { getCourses } from '@/api/courses'
 import { getExams } from '@/api/exams'
 import request from '@/api/index'
+import AdminTable from '@/components/AdminTable.vue'
 
 const loading = ref(false)
 const taskList = ref([]); const total = ref(0); const page = ref(1)
 const dialogVisible = ref(false); const isEdit = ref(false)
 const submitting = ref(false); const formRef = ref(null); const editId = ref(null)
 const availableCourses = ref([]); const availableExams = ref([])
+
+const columns = [
+  { prop: '标题', label: '任务名称', minWidth: 200 },
+  { slot: 'column-模式', label: '模式', width: 80, align: 'center' },
+  { slot: 'column-内容', label: '内容', width: 140, align: 'center' },
+  { slot: 'column-状态', label: '状态', width: 80, align: 'center' },
+  { prop: '创建人姓名', label: '创建人', width: 90, align: 'center' },
+]
 
 const form = reactive({ 标题:'', 描述:'', 模式:'free', 截止日期:null, 是否发布:false, 课程列表:[], 考试列表:[] })
 const rules = { 标题: [{ required: true, message:'请输入任务名称', trigger:'blur' }] }
@@ -213,7 +225,6 @@ const handleAssign = async (row) => {
   try {
     const detail = await getTaskDetail(row.ID)
     currentAssignments.value = detail.数据.指派记录 || []
-    // Load options
     if (assignType.value === 'department') {
       const r = await request.get('/departments'); assignOptions.value = (r.数据||[]).map(d=>({id:d.ID,name:d.名称}))
     } else {
@@ -227,7 +238,6 @@ const confirmAssign = async () => {
   try {
     await assignTask(assignTaskId.value, { 指派类型: assignType.value, 指派对象ID: assignTarget.value })
     ElMessage.success('指派成功')
-    // Reload
     const detail = await getTaskDetail(assignTaskId.value)
     currentAssignments.value = detail.数据.指派记录 || []
     assignTarget.value = null
@@ -247,5 +257,5 @@ onMounted(() => loadData())
 <style scoped>
 .tasks-page { max-width: 1200px; }
 .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-.page-title { font-size: 22px; font-weight: 600; color: #303133; }
+.page-title { font-size: 22px; font-weight: 600;  color: var(--text-primary);}
 </style>

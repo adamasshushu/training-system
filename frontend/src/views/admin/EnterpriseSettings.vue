@@ -8,8 +8,8 @@
         <el-tab-pane v-for="p in platforms" :key="p.key" :name="p.key">
           <template #label>
             <span :class="{ 'enabled-tab': configs[p.key]?.启用 }">
-              <el-icon v-if="configs[p.key]?.启用" color="#67C23A"><CircleCheck /></el-icon>
-              <el-icon v-else color="#c0c4cc"><CircleClose /></el-icon>
+              <el-icon v-if="configs[p.key]?.启用" color="var(--success)"><CircleCheck /></el-icon>
+              <el-icon v-else color="var(--text-tertiary)"><CircleClose /></el-icon>
               {{ p.label }}
             </span>
           </template>
@@ -185,8 +185,8 @@ onMounted(() => {
 
 <style scoped>
 .enterprise-settings { max-width: 900px; margin: 0 auto; }
-.page-desc { font-size: 13px; color: #909399; margin: 0 0 20px; }
+.page-desc { font-size: 13px; color: var(--text-tertiary); margin: 0 0 20px; }
 .config-form { max-width: 700px; }
-.enabled-tab { color: #67C23A; }
+.enabled-tab { color: var(--success); }
 .sync-result { text-align: center; }
 </style>

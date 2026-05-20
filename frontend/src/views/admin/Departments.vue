@@ -156,7 +156,7 @@ const handleSubmit = async () => {
 .page-title {
   font-size: 22px;
   font-weight: 600;
-  color: #303133;
+  color: var(--text-primary);
 }
 
 .tree-node {

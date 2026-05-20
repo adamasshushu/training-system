@@ -103,16 +103,16 @@ onMounted(loadNotifications)
   padding: 16px; border-radius: 8px; cursor: pointer;
   transition: background 0.2s;
 }
-.notif-item:hover { background: #f5f7fa; }
-.notif-item.unread { background: #ecf5ff; }
-.notif-item.unread:hover { background: #d9ecff; }
+.notif-item:hover { background: var(--bg-hover); }
+.notif-item.unread { background: var(--bg-hover); }
+.notif-item.unread:hover { background: var(--bg-hover); }
 .notif-dot {
   width: 8px; height: 8px; border-radius: 50%;
-  background: #409EFF; flex-shrink: 0; margin-top: 6px;
+  background: var(--info); flex-shrink: 0; margin-top: 6px;
 }
 .notif-body { flex: 1; min-width: 0; }
-.notif-title { font-size: 14px; font-weight: 600; color: #303133; margin-bottom: 4px; }
-.notif-content { font-size: 13px; color: #606266; margin-bottom: 4px; white-space: pre-wrap; }
-.notif-time { font-size: 12px; color: #c0c4cc; }
+.notif-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+.notif-content { font-size: 13px; color: var(--text-secondary); margin-bottom: 4px; white-space: pre-wrap; }
+.notif-time { font-size: 12px; color: var(--text-tertiary); }
 .pagination { margin-top: 16px; display: flex; justify-content: center; }
 </style>

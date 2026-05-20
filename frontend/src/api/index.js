@@ -40,7 +40,13 @@ request.interceptors.response.use(
           ElMessage.error('请求的资源不存在')
           break
         case 422:
-          ElMessage.error(data.message || '参数验证失败')
+          const detail = data.detail
+          if (Array.isArray(detail) && detail.length > 0) {
+            const errs = detail.map(d => `${d.loc?.slice(-1)[0] || ''}: ${d.msg}`).join('；')
+            ElMessage.error(errs)
+          } else {
+            ElMessage.error(data.message || '参数验证失败')
+          }
           break
         case 500:
           ElMessage.error('服务器内部错误')

@@ -3,7 +3,7 @@
     <!-- 顶部导航 -->
     <el-header class="admin-header">
       <div class="header-left">
-        <!-- 移动端汉堡菜单 -->
+        <!-- 侧边栏折叠按钮 -->
         <el-icon class="toggle-btn" @click="isMobile ? (drawerVisible = true) : toggleSidebar()">
           <Fold v-if="!isCollapsed && !isMobile" />
           <Expand v-else-if="!isMobile" />
@@ -24,16 +24,42 @@
         </div>
         <span class="system-title">培训管理系统</span>
       </div>
+
       <div class="header-right">
-        <el-dropdown trigger="click">
+        <!-- 暗黑模式切换 -->
+        <el-tooltip :content="isDark ? '切换亮色模式' : '切换暗黑模式'" placement="bottom">
+          <el-button
+            :icon="isDark ? Sunny : Moon"
+            circle
+            class="theme-toggle"
+            @click="toggleTheme"
+          />
+        </el-tooltip>
+
+        <!-- 用户信息 -->
+        <el-dropdown trigger="click" class="user-dropdown">
           <span class="user-info">
-            <el-avatar :size="32" icon="UserFilled" class="user-avatar" />
+            <el-avatar :size="32" class="user-avatar">
+              {{ username.charAt(0) }}
+            </el-avatar>
             <span class="username">{{ username }}</span>
-            <el-icon><ArrowDown /></el-icon>
+            <el-icon class="dropdown-arrow"><ArrowDown /></el-icon>
           </span>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
+              <el-dropdown-item class="user-menu-header" disabled>
+                <div class="menu-user-info">
+                  <el-avatar :size="36" class="menu-avatar">{{ username.charAt(0) }}</el-avatar>
+                  <div>
+                    <div class="menu-user-name">{{ username }}</div>
+                    <div class="menu-user-role">{{ userRole }}</div>
+                  </div>
+                </div>
+              </el-dropdown-item>
+              <el-dropdown-item divided @click="handleLogout">
+                <el-icon><SwitchButton /></el-icon>
+                退出登录
+              </el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -42,18 +68,34 @@
 
     <el-container class="admin-body">
       <!-- 桌面端侧边栏 -->
-      <el-aside v-if="!isMobile" :width="isCollapsed ? '64px' : '230px'" class="admin-sidebar">
+      <el-aside v-if="!isMobile" :width="sidebarWidth" class="admin-sidebar">
         <side-menu :is-collapsed="isCollapsed" />
+        <!-- 底部折叠按钮 -->
+        <div class="sidebar-collapse-btn" @click="toggleSidebar">
+          <el-icon :class="{ rotated: isCollapsed }">
+            <Fold />
+          </el-icon>
+        </div>
       </el-aside>
 
       <!-- 移动端抽屉菜单 -->
       <el-drawer v-model="drawerVisible" direction="ltr" size="260px" :with-header="false" class="mobile-drawer">
         <side-menu :is-collapsed="false" @click="drawerVisible = false" />
+        <div class="drawer-footer">
+          <el-button text @click="toggleTheme">
+            <el-icon><Moon /></el-icon>
+            {{ isDark ? '亮色模式' : '暗黑模式' }}
+          </el-button>
+        </div>
       </el-drawer>
 
       <!-- 右侧内容 -->
       <el-main class="admin-main">
-        <router-view />
+        <router-view v-slot="{ Component }">
+          <transition name="page-fade" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
       </el-main>
     </el-container>
   </el-container>
@@ -64,6 +106,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { removeToken, getUser } from '@/utils/auth'
 import { ElMessageBox } from 'element-plus'
+import { Sunny, Moon, SwitchButton } from '@element-plus/icons-vue'
 import SideMenu from './SideMenu.vue'
 
 const route = useRoute()
@@ -72,7 +115,14 @@ const isCollapsed = ref(false)
 const drawerVisible = ref(false)
 const isMobile = ref(window.innerWidth < 768)
 const userInfo = ref(getUser() || {})
+const isDark = ref(document.documentElement.classList.contains('dark'))
+
 const username = computed(() => userInfo.value?.真实姓名 || userInfo.value?.real_name || '管理员')
+const userRole = computed(() => {
+  const role = userInfo.value?.角色
+  return { admin: '系统管理员', teacher: '讲师', student: '学员' }[role] || role || '管理员'
+})
+const sidebarWidth = computed(() => isCollapsed.value ? '64px' : '240px')
 
 const checkMobile = () => {
   isMobile.value = window.innerWidth < 768
@@ -83,6 +133,18 @@ onUnmounted(() => window.removeEventListener('resize', checkMobile))
 
 const toggleSidebar = () => {
   isCollapsed.value = !isCollapsed.value
+}
+
+const toggleTheme = () => {
+  const html = document.documentElement
+  isDark.value = !html.classList.contains('dark')
+  if (isDark.value) {
+    html.classList.add('dark')
+    localStorage.setItem('theme-mode', 'dark')
+  } else {
+    html.classList.remove('dark')
+    localStorage.setItem('theme-mode', 'light')
+  }
 }
 
 const handleLogout = async () => {
@@ -100,22 +162,37 @@ const handleLogout = async () => {
   overflow: hidden;
 }
 
+/* ===== Header ===== */
 .admin-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 60px;
-  padding: 0 20px;
-  background: #fff;
-  border-bottom: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  height: var(--header-height);
+  padding: 0 var(--space-5);
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--header-border);
+  box-shadow: var(--shadow-xs);
   z-index: 10;
+  transition: background var(--transition-slow), border-color var(--transition-slow);
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
+}
+
+.toggle-btn {
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+  padding: 6px;
+  border-radius: var(--radius-md);
+}
+.toggle-btn:hover {
+  color: var(--text-brand);
+  background: var(--bg-hover);
 }
 
 .brand-logo {
@@ -123,81 +200,193 @@ const handleLogout = async () => {
   align-items: center;
 }
 
-.toggle-btn {
-  font-size: 20px;
-  cursor: pointer;
-  color: #64748b;
-  transition: color 0.2s;
-}
-.toggle-btn:hover {
-  color: #6C5CE7;
-}
-
 .system-title {
   font-size: 18px;
-  font-weight: 700;
-  color: #1a1a2e;
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
   white-space: nowrap;
   letter-spacing: -0.3px;
 }
 
+/* ===== Header right ===== */
 .header-right {
   display: flex;
   align-items: center;
+  gap: var(--space-2);
+}
+
+.theme-toggle {
+  --el-button-bg-color: transparent;
+  --el-button-border-color: transparent;
+  color: var(--text-secondary);
+  font-size: 18px;
+}
+.theme-toggle:hover {
+  color: var(--text-brand);
+  background: var(--bg-hover) !important;
+}
+
+.user-dropdown {
+  cursor: pointer;
 }
 
 .user-info {
   display: flex;
   align-items: center;
   gap: 8px;
-  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+.user-info:hover {
+  background: var(--bg-hover);
 }
 
 .user-avatar {
-  background: linear-gradient(135deg, #6C5CE7, #a29bfe);
+  background: linear-gradient(135deg, var(--brand-500), var(--brand-300));
+  font-size: 13px;
+  font-weight: var(--weight-semibold);
+  color: #fff;
 }
 
 .username {
   font-size: 14px;
-  color: #475569;
-  font-weight: 500;
+  color: var(--text-primary);
+  font-weight: var(--weight-medium);
 }
 
+.dropdown-arrow {
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+/* Dropdown menu */
+:deep(.el-dropdown-menu__item.user-menu-header) {
+  padding: 12px 16px !important;
+  cursor: default !important;
+}
+:deep(.user-menu-header:hover) {
+  background: transparent !important;
+}
+
+.menu-user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.menu-avatar {
+  background: linear-gradient(135deg, var(--brand-500), var(--brand-300));
+  font-size: 14px;
+  font-weight: var(--weight-semibold);
+  color: #fff;
+}
+.menu-user-name {
+  font-size: 14px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+.menu-user-role {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+/* ===== Sidebar ===== */
 .admin-sidebar {
-  background-color: #1a1a2e;
+  background: var(--sidebar-bg);
+  width: v-bind(sidebarWidth);
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
-  border-right: 1px solid rgba(255,255,255,0.04);
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(255, 255, 255, 0.04);
+  position: relative;
 }
 
+.sidebar-collapse-btn {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sidebar-text);
+  cursor: pointer;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  transition: all var(--transition-fast);
+  font-size: 16px;
+}
+.sidebar-collapse-btn:hover {
+  color: var(--sidebar-active-text);
+  background: var(--sidebar-hover);
+}
+.sidebar-collapse-btn .rotated {
+  transform: rotate(180deg);
+}
+
+/* ===== Main content ===== */
 .admin-main {
-  background-color: #f0f2f5;
-  padding: 20px;
+  background: var(--bg-page);
+  padding: var(--space-6);
   overflow-y: auto;
-  height: calc(100vh - 60px);
+  height: calc(100vh - var(--header-height));
+  transition: background var(--transition-slow);
 }
 
-/* mobile drawer overrides */
+/* ===== Page transition ===== */
+.page-fade-enter-active {
+  animation: fadeInUp 0.2s ease-out;
+}
+.page-fade-leave-active {
+  animation: fadeIn 0.15s ease-in reverse;
+}
+
+/* ===== Mobile drawer ===== */
 .mobile-drawer :deep(.el-drawer) {
-  background: #1a1a2e;
+  background: var(--sidebar-bg);
 }
 .mobile-drawer :deep(.el-drawer__body) {
   padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.drawer-footer {
+  margin-top: auto;
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  justify-content: center;
+}
+.drawer-footer .el-button {
+  color: var(--sidebar-text);
+  gap: 8px;
 }
 
-/* 移动端适配 */
+/* ===== Responsive ===== */
 @media (max-width: 768px) {
   .admin-header {
-    padding: 0 12px;
+    padding: 0 var(--space-3);
   }
   .system-title {
     font-size: 15px;
   }
   .admin-main {
-    padding: 12px;
+    padding: var(--space-3);
   }
   .username {
     display: none;
+  }
+}
+
+/* ===== Reduced motion ===== */
+@media (prefers-reduced-motion: reduce) {
+  .admin-sidebar,
+  .page-fade-enter-active,
+  .page-fade-leave-active {
+    animation: none !important;
+    transition: none !important;
   }
 }
 </style>

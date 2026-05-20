@@ -4,7 +4,7 @@
 ```bash
 # 后端
 cd /home/cyborg/training-system/backend && source ../venv/bin/activate
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+uvicorn app.main:app --host 0.0.0.0 --port 8004
 
 # 前端
 cd /home/cyborg/training-system/frontend && npm run dev -- --host 0.0.0.0
@@ -17,15 +17,16 @@ cd /home/cyborg/training-system/frontend && npm run dev -- --host 0.0.0.0
 ## 启动方式
 
 ### 开发模式（前端+Vite热更新）
+### 开发模式（前端+Vite热更新）
 ```bash
-# 后端（HTTPS，带前端静态文件服务）
-cd /home/cyborg/training-system/backend && source ../venv/bin/activate && rm -f training.db
+# 后端（HTTPS）
+cd /home/cyborg/training-system/backend && source ../venv/bin/activate
 uvicorn app.main:app --host 0.0.0.0 --port 8443 --ssl-certfile=cert.pem --ssl-keyfile=key.pem
 
-# 前端热更新
+# 前端热更新（HTTPS）
 cd /home/cyborg/training-system/frontend && npm run dev -- --host 0.0.0.0
 
-# 访问: http://localhost:5173 (前端) 或 https://localhost:8443 (统一HTTPS)
+# 访问: https://localhost:5173 (前端 HTTPS) 或 https://服务器IP:8443 (统一HTTPS)
 ```
 
 ### 生产模式（一键HTTPS启动）

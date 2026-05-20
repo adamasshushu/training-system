@@ -1,39 +1,45 @@
 <template>
   <div class="course-categories">
-    <div class="page-header">
-      <h2 class="page-title">课程分类</h2>
-      <el-button type="primary" @click="handleAdd">
-        <el-icon><Plus /></el-icon>新增分类
-      </el-button>
-    </div>
+    <AdminTable
+      :data="categoryList"
+      :loading="loading"
+      :total="total"
+      v-model:model-value="page"
+      :page-size="pageSize"
+      :show-pagination="false"
+      :columns="columns"
+      :actions-width="180"
+    >
+      <template #page-header>
+        <div class="page-header">
+          <h2 class="page-title">课程分类</h2>
+          <el-button type="primary" @click="handleAdd"><el-icon><Plus /></el-icon>新增分类</el-button>
+        </div>
+      </template>
 
-    <el-card shadow="never">
-      <el-table :data="categoryList" border stripe v-loading="loading" style="width: 100%">
-        <el-table-column type="index" label="#" width="60" />
-        <el-table-column label="分类名称" min-width="200">
-          <template #default="{ row }">{{ row['名称'] }}</template>
-        </el-table-column>
-        <el-table-column label="排序" width="100" align="center">
-          <template #default="{ row }">{{ row['排序'] }}</template>
-        </el-table-column>
-        <el-table-column label="课程数" width="100" align="center">
-          <template #default="{ row }">{{ row['课程数量'] || 0 }}</template>
-        </el-table-column>
-        <el-table-column label="状态" width="100" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row['是否激活'] ? 'success' : 'info'" size="small">
-              {{ row['是否激活'] ? '激活' : '停用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
-          <template #default="{ row }">
-            <el-button text size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
-            <el-button text size="small" type="danger" @click="handleDelete(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+      <template #column-名称="{ row }">
+        {{ row['名称'] }}
+      </template>
+
+      <template #column-排序="{ row }">
+        {{ row['排序'] }}
+      </template>
+
+      <template #column-课程数="{ row }">
+        {{ row['课程数量'] || 0 }}
+      </template>
+
+      <template #column-状态="{ row }">
+        <el-tag :type="row['是否激活'] ? 'success' : 'info'" size="small">
+          {{ row['是否激活'] ? '激活' : '停用' }}
+        </el-tag>
+      </template>
+
+      <template #actions="{ row }">
+        <el-button text size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
+        <el-button text size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+      </template>
+    </AdminTable>
 
     <el-dialog
       v-model="dialogVisible"
@@ -58,11 +64,16 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getCategories, createCategory, deleteCategory } from '@/api/courses'
+import AdminTable from '@/components/AdminTable.vue'
 
 const categoryList = ref([])
 const loading = ref(false)
+const total = ref(0)
+const page = ref(1)
+const pageSize = ref(10)
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const submitting = ref(false)
@@ -72,11 +83,19 @@ const editId = ref(null)
 const form = reactive({ '名称': '', '排序': 0 })
 const rules = { '名称': [{ required: true, message: '请输入分类名称', trigger: 'blur' }] }
 
+const columns = [
+  { slot: 'column-名称', label: '分类名称', minWidth: 200 },
+  { slot: 'column-排序', label: '排序', width: 100, align: 'center' },
+  { slot: 'column-课程数', label: '课程数', width: 100, align: 'center' },
+  { slot: 'column-状态', label: '状态', width: 100, align: 'center' },
+]
+
 const fetchCategories = async () => {
   loading.value = true
   try {
     const res = await getCategories()
     categoryList.value = res['数据'] || []
+    total.value = categoryList.value.length
   } catch (e) {
     ElMessage.error('获取分类列表失败')
   } finally {
@@ -138,5 +157,5 @@ onMounted(() => {
 <style scoped>
 .course-categories { max-width: 1200px; }
 .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-.page-title { font-size: 22px; font-weight: 600; color: #303133; }
+.page-title { font-size: 22px; font-weight: 600; color: var(--text-primary); }
 </style>

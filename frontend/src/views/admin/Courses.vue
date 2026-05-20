@@ -1,82 +1,84 @@
 <template>
   <div class="courses">
-    <div class="page-header">
-      <h2 class="page-title">课程管理</h2>
-      <div class="header-actions">
-        <el-select v-model="categoryFilter" placeholder="分类筛选" clearable style="width: 140px">
-          <el-option
-            v-for="cat in categories"
-            :key="cat['ID']"
-            :label="cat['名称']"
-            :value="cat['ID']"
-          />
-        </el-select>
-        <el-input
-          v-model="searchQuery"
-          placeholder="搜索课程名称"
-          clearable
-          style="width: 200px"
-          :prefix-icon="Search"
-        />
-        <el-button type="primary" @click="handleAdd">
-          <el-icon><Plus /></el-icon>新建课程
-        </el-button>
-      </div>
-    </div>
-
-    <el-card shadow="never">
-      <el-table :data="courseList" border stripe v-loading="loading" style="width: 100%">
-        <el-table-column type="index" label="#" width="60" />
-        <el-table-column label="课程名称" min-width="200">
-          <template #default="{ row }">{{ row['标题'] }}</template>
-        </el-table-column>
-        <el-table-column label="分类" width="120">
-          <template #default="{ row }">{{ row['分类名称'] }}</template>
-        </el-table-column>
-        <el-table-column label="讲师" width="120">
-          <template #default="{ row }">{{ row['讲师名称'] }}</template>
-        </el-table-column>
-        <el-table-column label="章节数" width="80" align="center">
-          <template #default="{ row }">{{ row['章节数'] || 0 }}</template>
-        </el-table-column>
-        <el-table-column label="创建时间" width="170">
-          <template #default="{ row }">{{ row['创建时间'] }}</template>
-        </el-table-column>
-        <el-table-column label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="row['是否发布'] ? 'success' : 'info'" size="small">
-              {{ row['是否发布'] ? '已发布' : '草稿' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="260" fixed="right">
-          <template #default="{ row }">
-            <el-button text size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
-            <el-button text size="small" type="success" @click="handleChapter(row)">章节</el-button>
-            <el-button
-              text
-              size="small"
-              :type="row['是否发布'] ? 'warning' : 'success'"
-              @click="toggleStatus(row)"
-            >
-              {{ row['是否发布'] ? '下架' : '发布' }}
+    <AdminTable
+      :data="courseList"
+      :loading="loading"
+      :total="total"
+      v-model:model-value="page"
+      v-model:page-size="pageSize"
+      :columns="columns"
+      :show-search="false"
+      :actions-width="260"
+      :page-sizes="[10, 20, 50]"
+      @size-change="fetchCourses"
+      @current-change="fetchCourses"
+    >
+      <template #page-header>
+        <div class="page-header">
+          <h2 class="page-title">课程管理</h2>
+          <div class="header-actions">
+            <el-select v-model="categoryFilter" placeholder="分类筛选" clearable style="width: 140px">
+              <el-option
+                v-for="cat in categories"
+                :key="cat['ID']"
+                :label="cat['名称']"
+                :value="cat['ID']"
+              />
+            </el-select>
+            <el-input
+              v-model="searchQuery"
+              placeholder="搜索课程名称"
+              clearable
+              style="width: 200px"
+              :prefix-icon="Search"
+            />
+            <el-button type="primary" @click="handleAdd">
+              <el-icon><Plus /></el-icon>新建课程
             </el-button>
-            <el-button text size="small" type="danger" @click="handleDelete(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+          </div>
+        </div>
+      </template>
 
-      <div class="pagination-wrapper">
-        <el-pagination
-          v-model:current-page="page"
-          v-model:page-size="pageSize"
-          :total="total"
-          layout="total, sizes, prev, pager, next"
-          @size-change="fetchCourses"
-          @current-change="fetchCourses"
-        />
-      </div>
-    </el-card>
+      <template #column-课程名称="{ row }">
+        {{ row['标题'] }}
+      </template>
+
+      <template #column-分类="{ row }">
+        {{ row['分类名称'] }}
+      </template>
+
+      <template #column-讲师="{ row }">
+        {{ row['讲师名称'] }}
+      </template>
+
+      <template #column-章节数="{ row }">
+        {{ row['章节数'] || 0 }}
+      </template>
+
+      <template #column-创建时间="{ row }">
+        {{ row['创建时间'] }}
+      </template>
+
+      <template #column-状态="{ row }">
+        <el-tag :type="row['是否发布'] ? 'success' : 'info'" size="small">
+          {{ row['是否发布'] ? '已发布' : '草稿' }}
+        </el-tag>
+      </template>
+
+      <template #actions="{ row }">
+        <el-button text size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
+        <el-button text size="small" type="success" @click="handleChapter(row)">章节</el-button>
+        <el-button
+          text
+          size="small"
+          :type="row['是否发布'] ? 'warning' : 'success'"
+          @click="toggleStatus(row)"
+        >
+          {{ row['是否发布'] ? '下架' : '发布' }}
+        </el-button>
+        <el-button text size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+      </template>
+    </AdminTable>
 
     <!-- 新建/编辑弹窗 -->
     <el-dialog
@@ -140,7 +142,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { Search } from '@element-plus/icons-vue'
+import { Search, Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getCategories,
@@ -150,6 +152,7 @@ import {
   deleteCourse,
   getCourseDetail
 } from '@/api/courses'
+import AdminTable from '@/components/AdminTable.vue'
 
 const courseList = ref([])
 const categories = ref([])
@@ -169,6 +172,15 @@ const editId = ref(null)
 const chapterDialogVisible = ref(false)
 const chapters = ref([])
 const currentCourseId = ref(null)
+
+const columns = [
+  { slot: 'column-课程名称', label: '课程名称', minWidth: 200 },
+  { slot: 'column-分类', label: '分类', width: 120 },
+  { slot: 'column-讲师', label: '讲师', width: 120 },
+  { slot: 'column-章节数', label: '章节数', width: 80, align: 'center' },
+  { slot: 'column-创建时间', label: '创建时间', width: 170 },
+  { slot: 'column-状态', label: '状态', width: 100 },
+]
 
 const form = reactive({
   '标题': '',
@@ -315,7 +327,7 @@ onMounted(() => {
 .page-title {
   font-size: 22px;
   font-weight: 600;
-  color: #303133;
+  color: var(--text-primary);
 }
 
 .header-actions {
@@ -333,13 +345,13 @@ onMounted(() => {
 .empty-chapters {
   text-align: center;
   padding: 40px;
-  color: #909399;
+  color: var(--text-tertiary);
 }
 
 .chapter-block {
   margin-bottom: 16px;
   padding: 12px;
-  background: #f5f7fa;
+  background: var(--bg-page);
   border-radius: 8px;
 }
 
@@ -359,6 +371,6 @@ onMounted(() => {
 
 .lesson-title-text {
   font-size: 14px;
-  color: #606266;
+  color: var(--text-secondary);
 }
 </style>

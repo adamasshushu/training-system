@@ -1,6 +1,6 @@
 <template>
   <div class="progress-dashboard">
-    <h2 style="margin: 0 0 20px; font-size: 18px; color: #303133">📊 学习进度概览</h2>
+    <h2 style="margin: 0 0 20px; font-size: 18px; color: var(--text-primary)">📊 学习进度概览</h2>
 
     <!-- 统计卡片 -->
     <el-row :gutter="16" class="stat-cards">
@@ -15,9 +15,10 @@
     <!-- 按部门统计 -->
     <el-card class="section-card" style="margin-top: 16px">
       <template #header>按部门统计</template>
-      <el-table :data="deptStats" v-loading="loadingDept" stripe>
-        <el-table-column prop="部门名称" label="部门" />
-        <el-table-column prop="员工数" label="员工数" width="100" />
+      <el-table :data="deptStats" v-loading="loadingDept" border stripe>
+        <el-table-column type="index" label="#" width="55" />
+        <el-table-column prop="部门名称" label="部门" min-width="200" />
+        <el-table-column prop="员工数" label="员工数" width="100" align="center" />
         <el-table-column label="平均进度" width="200">
           <template #default="{ row }">
             <el-progress :percentage="row.平均进度" :stroke-width="16" />
@@ -37,11 +38,12 @@
         </el-form-item>
       </el-form>
 
-      <el-table v-if="courseProgressData" :data="courseProgressData.学员列表" v-loading="loadingProgress" stripe>
-        <el-table-column prop="姓名" label="学员姓名" />
-        <el-table-column prop="部门" label="部门" />
-        <el-table-column prop="总课时" label="总课时" width="80" />
-        <el-table-column prop="已完成" label="已完成" width="80" />
+      <el-table v-if="courseProgressData" :data="courseProgressData.学员列表" v-loading="loadingProgress" border stripe>
+        <el-table-column type="index" label="#" width="55" />
+        <el-table-column prop="姓名" label="学员姓名" min-width="120" />
+        <el-table-column prop="部门" label="部门" width="120" />
+        <el-table-column prop="总课时" label="总课时" width="80" align="center" />
+        <el-table-column prop="已完成" label="已完成" width="80" align="center" />
         <el-table-column label="进度" width="200">
           <template #default="{ row }">
             <el-progress :percentage="row.进度" :stroke-width="16" />
@@ -63,31 +65,24 @@ import axios from 'axios'
 const API = axios.create({ baseURL: '' })
 API.interceptors.request.use((c) => { c.headers.Authorization = `Bearer ${getToken()}`; return c })
 
-const stats = ref([])
-const deptStats = ref([])
 const loadingDept = ref(false)
+const loadingProgress = ref(false)
+const deptStats = ref([])
 const courses = ref([])
 const selectedCourseId = ref(null)
 const courseProgressData = ref(null)
-const loadingProgress = ref(false)
 
-const loadOverview = async () => {
-  try {
-    const res = await API.get('/api/progress/overview')
-    const d = res.data.数据 || {}
-    stats.value = [
-      { label: '总员工数', value: d.总员工数 || 0 },
-      { label: '总课程数', value: d.总课程数 || 0 },
-      { label: '学习记录', value: d.学习记录数 || 0 },
-      { label: '考试记录', value: d.考试记录数 || 0 },
-    ]
-  } catch { /* silent */ }
-}
+const stats = ref([
+  { label: '总学员', value: '--' },
+  { label: '课程总数', value: '--' },
+  { label: '完成率', value: '--%' },
+  { label: '活跃学员', value: '--' },
+])
 
 const loadDeptStats = async () => {
   loadingDept.value = true
   try {
-    const res = await API.get('/api/progress/by-department')
+    const res = await API.get('/api/reports/department-progress')
     deptStats.value = res.data.数据 || []
   } catch { /* silent */ }
   finally { loadingDept.value = false }
@@ -95,27 +90,30 @@ const loadDeptStats = async () => {
 
 const loadCourses = async () => {
   try {
-    const res = await API.get('/api/courses', { params: { page_size: 200 } })
+    const res = await API.get('/api/courses/student')
     courses.value = res.data.数据 || []
   } catch { /* silent */ }
 }
 
 const loadCourseProgress = async (courseId) => {
-  if (!courseId) return
+  if (!courseId) { courseProgressData.value = null; return }
   loadingProgress.value = true
   try {
-    const res = await API.get(`/api/progress/course/${courseId}`)
-    courseProgressData.value = res.data.数据 || null
-  } catch { ElMessage.error('加载失败') }
+    const res = await API.get(`/api/courses/${courseId}/progress`)
+    courseProgressData.value = res.data
+  } catch { ElMessage.error('加载课程进度失败') }
   finally { loadingProgress.value = false }
 }
 
-onMounted(() => { loadOverview(); loadDeptStats(); loadCourses() })
+onMounted(() => {
+  loadDeptStats()
+  loadCourses()
+})
 </script>
 
 <style scoped>
-.stat-cards { margin-bottom: 8px; }
+.progress-dashboard { max-width: 1200px; }
 .stat-card { text-align: center; }
-.stat-value { font-size: 32px; font-weight: 700; color: #409EFF; }
-.stat-label { font-size: 13px; color: #909399; margin-top: 4px; }
+.stat-value { font-size: 28px; font-weight: 700; color: var(--text-primary); }
+.stat-label { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
 </style>

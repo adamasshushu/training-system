@@ -1,65 +1,63 @@
 <template>
   <div class="questions-page">
-    <div class="page-header">
-      <h2 class="page-title">题库管理</h2>
-      <el-button type="primary" @click="handleAdd">
-        <el-icon><Plus /></el-icon>新增题目
-      </el-button>
-    </div>
+    <AdminTable
+      :data="questionList"
+      :loading="loading"
+      :total="total"
+      v-model:model-value="pagination.page"
+      v-model:page-size="pagination.page_size"
+      :columns="columns"
+      :show-search="false"
+      :show-pagination="true"
+      :actions-width="140"
+      :page-sizes="[10, 20, 50]"
+      @current-change="loadData"
+      @size-change="loadData"
+    >
+      <template #page-header>
+        <div class="page-header">
+          <h2 class="page-title">题库管理</h2>
+          <el-button type="primary" @click="handleAdd">
+            <el-icon><Plus /></el-icon>新增题目
+          </el-button>
+        </div>
+      </template>
 
-    <!-- 筛选栏 -->
-    <el-card shadow="never" class="filter-bar">
-      <el-row :gutter="16" align="middle">
-        <el-col :xs="24" :sm="8">
-          <el-select v-model="filters.question_type" placeholder="题型筛选" clearable style="width:100%">
-            <el-option label="单选题" value="single" />
-            <el-option label="多选题" value="multi" />
-            <el-option label="判断题" value="judge" />
-            <el-option label="填空题" value="fill" />
-            <el-option label="简答题" value="short_answer" />
-          </el-select>
-        </el-col>
-        <el-col :xs="24" :sm="8">
-          <el-input v-model="filters.keyword" placeholder="搜索题目内容" clearable @clear="loadData" @keyup.enter="loadData" />
-        </el-col>
-        <el-col :xs="24" :sm="4">
-          <el-button type="primary" @click="loadData" :icon="Search">搜索</el-button>
-        </el-col>
-      </el-row>
-    </el-card>
+      <template #filter>
+        <el-card shadow="never" class="filter-bar">
+          <el-row :gutter="16" align="middle">
+            <el-col :xs="24" :sm="8">
+              <el-select v-model="filters.question_type" placeholder="题型筛选" clearable style="width:100%">
+                <el-option label="单选题" value="single" />
+                <el-option label="多选题" value="multi" />
+                <el-option label="判断题" value="judge" />
+                <el-option label="填空题" value="fill" />
+                <el-option label="简答题" value="short_answer" />
+              </el-select>
+            </el-col>
+            <el-col :xs="24" :sm="8">
+              <el-input v-model="filters.keyword" placeholder="搜索题目内容" clearable @clear="loadData" @keyup.enter="loadData" />
+            </el-col>
+            <el-col :xs="24" :sm="4">
+              <el-button type="primary" @click="loadData" :icon="Search">搜索</el-button>
+            </el-col>
+          </el-row>
+        </el-card>
+      </template>
 
-    <!-- 题目表格 -->
-    <el-card shadow="never" style="margin-top:16px">
-      <el-table :data="questionList" border stripe v-loading="loading">
-        <el-table-column type="index" label="#" width="55" />
-        <el-table-column label="题型" width="90">
-          <template #default="{ row }">
-            <el-tag :type="typeTag(row.题型)" size="small">{{ typeLabel(row.题型) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="题目内容" label="题目内容" min-width="280" show-overflow-tooltip />
-        <el-table-column prop="分值" label="分值" width="70" align="center" />
-        <el-table-column label="难度" width="80" align="center">
-          <template #default="{ row }">
-            <el-rate v-model="row.难度" disabled show-score text-color="#ff9900" />
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="140" fixed="right">
-          <template #default="{ row }">
-            <el-button text size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
-            <el-button text size="small" type="danger" @click="handleDelete(row)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <el-pagination
-        v-model:current-page="pagination.page"
-        :page-size="pagination.page_size"
-        :total="total"
-        layout="total, prev, pager, next"
-        @current-change="loadData"
-        style="margin-top:16px; justify-content:center"
-      />
-    </el-card>
+      <template #column-题型="{ row }">
+        <el-tag :type="typeTag(row.题型)" size="small">{{ typeLabel(row.题型) }}</el-tag>
+      </template>
+
+      <template #column-难度="{ row }">
+        <el-rate v-model="row.难度" disabled show-score text-color="#ff9900" />
+      </template>
+
+      <template #actions="{ row }">
+        <el-button text size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
+        <el-button text size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+      </template>
+    </AdminTable>
 
     <!-- 新增/编辑对话框 -->
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑题目' : '新增题目'" width="650px" destroy-on-close>
@@ -122,6 +120,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { Plus, Search, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getQuestions, createQuestion, updateQuestion, deleteQuestion } from '@/api/exams'
+import AdminTable from '@/components/AdminTable.vue'
 
 const loading = ref(false)
 const questionList = ref([])
@@ -134,6 +133,13 @@ const editId = ref(null)
 
 const filters = reactive({ question_type: '', keyword: '' })
 const pagination = reactive({ page: 1, page_size: 20 })
+
+const columns = [
+  { slot: 'column-题型', label: '题型', width: 90 },
+  { prop: '题目内容', label: '题目内容', minWidth: 280, ellipsis: true },
+  { prop: '分值', label: '分值', width: 70, align: 'center' },
+  { slot: 'column-难度', label: '难度', width: 80, align: 'center' },
+]
 
 const form = reactive({
   题型: 'single', 题目内容: '', 分值: 10, 难度: 1,
@@ -243,6 +249,6 @@ onMounted(() => loadData())
 <style scoped>
 .questions-page { max-width: 1200px; }
 .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-.page-title { font-size: 22px; font-weight: 600; color: #303133; }
-.filter-bar { margin-bottom: 0; }
+.page-title { font-size: 22px; font-weight: 600; color: var(--text-primary); }
+.filter-bar { margin-bottom: var(--space-4); }
 </style>

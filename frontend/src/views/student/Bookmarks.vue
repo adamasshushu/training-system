@@ -129,7 +129,7 @@ onMounted(() => { loadBookmarks(); loadNotes() })
   justify-content: center; border-radius: 8px 8px 0 0;
 }
 .bookmark-body { padding: 12px 0 0; }
-.bookmark-body h3 { margin: 0 0 4px; font-size: 14px; color: #303133; }
-.bookmark-time { font-size: 12px; color: #c0c4cc; }
+.bookmark-body h3 { margin: 0 0 4px; font-size: 14px; color: var(--text-primary); }
+.bookmark-time { font-size: 12px; color: var(--text-tertiary); }
 .pagination { margin-top: 16px; display: flex; justify-content: center; }
 </style>

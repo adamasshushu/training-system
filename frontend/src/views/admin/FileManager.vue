@@ -2,7 +2,7 @@
   <div class="file-manager">
     <el-card class="page-card">
       <div class="page-header">
-        <h2>📁 文件管理</h2>
+        <h2 style="margin:0;font-size:22px;font-weight:600;color:var(--text-primary)">📁 文件管理</h2>
         <div class="header-actions">
           <el-upload
             :action="uploadUrl"
@@ -33,15 +33,15 @@
       </el-row>
 
       <!-- 文件列表 -->
-      <el-table :data="files" stripe v-loading="loading" style="width: 100%">
-        <el-table-column prop="ID" label="ID" width="60" />
+      <el-table :data="files" border stripe v-loading="loading" style="width: 100%">
+        <el-table-column type="index" label="#" width="55" />
         <el-table-column prop="文件名" label="文件名" min-width="300">
           <template #default="{ row }">
             <div class="file-name-cell">
-              <el-icon v-if="row.文件类型 === 'image'" color="#409EFF"><Picture /></el-icon>
-              <el-icon v-else-if="row.文件类型 === 'video'" color="#E6A23C"><VideoCamera /></el-icon>
-              <el-icon v-else-if="row.文件类型 === 'document'" color="#67C23A"><Document /></el-icon>
-              <el-icon v-else-if="row.文件类型 === 'html'" color="#909399"><Link /></el-icon>
+              <el-icon v-if="row.文件类型 === 'image'" color="var(--info)"><Picture /></el-icon>
+              <el-icon v-else-if="row.文件类型 === 'video'" color="var(--warning)"><VideoCamera /></el-icon>
+              <el-icon v-else-if="row.文件类型 === 'document'" color="var(--success)"><Document /></el-icon>
+              <el-icon v-else-if="row.文件类型 === 'html'" color="var(--text-tertiary)"><Link /></el-icon>
               <el-icon v-else><Folder /></el-icon>
               <span class="file-name">{{ row.文件名 }}</span>
             </div>
@@ -56,11 +56,11 @@
         <el-table-column prop="创建时间" label="上传时间" width="180" />
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link :icon="View" @click="previewFile(row)">预览</el-button>
-            <el-button type="primary" link :icon="CopyDocument" @click="copyUrl(row)">复制链接</el-button>
+            <el-button text size="small" type="primary" @click="previewFile(row)">预览</el-button>
+            <el-button text size="small" type="primary" @click="copyUrl(row)">复制链接</el-button>
             <el-popconfirm title="确定删除？" @confirm="deleteFile(row)">
               <template #reference>
-                <el-button type="danger" link :icon="Delete">删除</el-button>
+                <el-button text size="small" type="danger">删除</el-button>
               </template>
             </el-popconfirm>
           </template>
@@ -72,7 +72,7 @@
         v-model:current-page="page"
         :page-size="pageSize"
         :total="total"
-        layout="prev, pager, next"
+        layout="total, prev, pager, next"
         class="pagination"
         @current-change="loadFiles"
       />
@@ -98,7 +98,6 @@ import { getToken } from '@/utils/auth'
 import axios from 'axios'
 
 const API = axios.create({ baseURL: '' })
-// Auto-wrap with token
 API.interceptors.request.use((config) => {
   config.headers.Authorization = `Bearer ${getToken()}`
   return config
@@ -194,11 +193,6 @@ onMounted(loadFiles)
   align-items: center;
   margin-bottom: 16px;
 }
-.page-header h2 {
-  margin: 0;
-  font-size: 18px;
-  color: #303133;
-}
 .filter-bar {
   margin-bottom: 16px;
 }
@@ -215,7 +209,7 @@ onMounted(loadFiles)
 .pagination {
   margin-top: 16px;
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
 }
 .preview-image {
   max-width: 100%;

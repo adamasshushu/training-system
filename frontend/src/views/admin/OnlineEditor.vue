@@ -162,7 +162,7 @@ const saveContent = async () => {
 }
 .pane-header {
   padding: 8px 12px;
-  background: #f5f7fa;
+  background: var(--bg-page);
   font-size: 13px;
   color: #909399;
   border-bottom: 1px solid #dcdfe6;
@@ -185,13 +185,13 @@ const saveContent = async () => {
   margin: 16px 0 8px;
 }
 .markdown-preview pre {
-  background: #f5f7fa;
+  background: var(--bg-page);
   padding: 12px;
   border-radius: 6px;
   overflow-x: auto;
 }
 .markdown-preview code {
-  background: #f5f7fa;
+  background: var(--bg-page);
   padding: 2px 6px;
   border-radius: 3px;
   font-size: 13px;

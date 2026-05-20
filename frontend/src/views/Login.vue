@@ -1,14 +1,32 @@
 <template>
   <div class="login-container">
+    <!-- Animated background orbs -->
+    <div class="bg-orb bg-orb-1"></div>
+    <div class="bg-orb bg-orb-2"></div>
+    <div class="bg-orb bg-orb-3"></div>
+
+    <!-- Floating particles grid -->
+    <div class="particles">
+      <div v-for="i in 20" :key="i" class="particle" :style="particleStyle(i)"></div>
+    </div>
+
+    <!-- Brand badge top-right -->
+    <div class="brand-badge">
+      <span class="badge-dot"></span>
+      v2.2
+    </div>
+
+    <!-- Main login card -->
     <div class="login-card">
       <div class="login-header">
         <div class="logo">
           <img v-if="branding.logo_url" :src="branding.logo_url" class="logo-img" />
           <div v-else class="logo-icon">
-            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-              <rect width="48" height="48" rx="12" fill="url(#logo-grad)" />
+            <svg width="56" height="56" viewBox="0 0 48 48" fill="none">
+              <rect width="48" height="48" rx="14" fill="url(#logo-grad)" />
               <path d="M14 30V18l10-6 10 6v12l-10 6-10-6z" stroke="white" stroke-width="2" fill="rgba(255,255,255,0.15)"/>
-              <path d="M24 22v8m-4-4h8" stroke="white" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="24" cy="22" r="3" fill="white" opacity="0.9"/>
+              <path d="M24 28v6m-3-3h6" stroke="white" stroke-width="2" stroke-linecap="round"/>
               <defs>
                 <linearGradient id="logo-grad" x1="0" y1="0" x2="48" y2="48">
                   <stop stop-color="#6C5CE7"/>
@@ -55,7 +73,7 @@
             class="login-btn"
             @click="handleLogin"
           >
-            {{ loading ? '登录中...' : '登 录' }}
+            <span v-if="!loading" class="btn-text">登 录</span>
           </el-button>
         </el-form-item>
 
@@ -63,6 +81,13 @@
           <span class="hint-text">演示账号：admin / admin123</span>
         </div>
       </el-form>
+    </div>
+
+    <!-- Footer -->
+    <div class="login-footer-bar">
+      <span>培训管理系统</span>
+      <span class="footer-dot">·</span>
+      <span>企业内部培训平台</span>
     </div>
   </div>
 </template>
@@ -95,7 +120,6 @@ const loginRules = {
   ]
 }
 
-// 品牌配置（动态从后端加载）
 const branding = reactive({
   logo_url: '',
   system_name: '培训管理系统',
@@ -110,7 +134,21 @@ const loadBranding = async () => {
     branding.system_name = data.系统名称 || '培训管理系统'
     branding.login_tagline = data.登录页标语 || '企业内部培训管理平台'
   } catch {
-    // 使用默认值
+    // 默认值
+  }
+}
+
+// Random particle positions (computed once)
+const particleStyle = (i) => {
+  const seed = i * 37
+  return {
+    left: `${(seed * 7.3) % 100}%`,
+    top: `${(seed * 11.7) % 100}%`,
+    width: `${(seed % 3 + 2)}px`,
+    height: `${(seed % 3 + 2)}px`,
+    animationDelay: `${(seed % 10) * 0.5}s`,
+    animationDuration: `${(seed % 8) + 6}s`,
+    opacity: 0.15 + (seed % 5) * 0.04
   }
 }
 
@@ -121,7 +159,6 @@ const handleLogin = async () => {
   loading.value = true
   try {
     const res = await login(loginForm)
-    // Clear any stale data first
     localStorage.removeItem('training-system-user')
     setToken(res.access_token)
     if (res.用户信息) {
@@ -146,35 +183,115 @@ onMounted(loadBranding)
 
 <style scoped>
 .login-container {
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #1a1a2e 0%, #2a2166 40%, #6C5CE7 100%);
+  background: linear-gradient(135deg, #0f0f1a 0%, #1a1240 30%, #2a2166 60%, #6C5CE7 100%);
   position: relative;
   overflow: hidden;
+  animation: fadeIn 0.6s ease-out;
 }
 
-.login-container::before {
-  content: '';
+/* ===== Animated background orbs ===== */
+.bg-orb {
   position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle at 30% 50%, rgba(108,92,231,0.15) 0%, transparent 50%),
-              radial-gradient(circle at 70% 30%, rgba(162,155,254,0.1) 0%, transparent 40%);
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  animation: orbFloat 20s ease-in-out infinite;
+}
+.bg-orb-1 {
+  width: 500px;
+  height: 500px;
+  background: rgba(108, 92, 231, 0.2);
+  top: -10%;
+  left: -5%;
+  animation-delay: 0s;
+}
+.bg-orb-2 {
+  width: 400px;
+  height: 400px;
+  background: rgba(162, 155, 254, 0.15);
+  bottom: -15%;
+  right: -8%;
+  animation-delay: -7s;
+}
+.bg-orb-3 {
+  width: 300px;
+  height: 300px;
+  background: rgba(124, 58, 237, 0.12);
+  top: 40%;
+  right: 15%;
+  animation-delay: -14s;
+}
+
+@keyframes orbFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(30px, -40px) scale(1.1); }
+  50% { transform: translate(-20px, 20px) scale(0.95); }
+  75% { transform: translate(40px, 30px) scale(1.05); }
+}
+
+/* ===== Floating particles ===== */
+.particles {
+  position: absolute;
+  inset: 0;
   pointer-events: none;
 }
+.particle {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  animation: particleFloat linear infinite;
+}
+@keyframes particleFloat {
+  0% { transform: translateY(0) scale(1); opacity: 0; }
+  10% { opacity: 0.6; }
+  90% { opacity: 0.6; }
+  100% { transform: translateY(-100vh) scale(0.5); opacity: 0; }
+}
 
+/* ===== Brand badge ===== */
+.brand-badge {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  font-weight: 500;
+}
+.badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* ===== Login card ===== */
 .login-card {
   width: 420px;
-  padding: 40px;
-  background: rgba(255, 255, 255, 0.98);
-  border-radius: 16px;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25);
+  padding: 40px 36px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
   position: relative;
-  backdrop-filter: blur(20px);
+  z-index: 1;
+  animation: fadeInUp 0.6s ease-out;
 }
 
 .login-header {
@@ -183,55 +300,171 @@ onMounted(loadBranding)
 }
 
 .logo {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   display: flex;
   justify-content: center;
+  animation: fadeInScale 0.5s ease-out;
 }
 
 .logo-img {
-  max-width: 80px;
-  max-height: 80px;
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  border-radius: var(--radius-lg);
 }
 
 .logo-icon {
-  width: 56px;
-  height: 56px;
+  width: 64px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
+  filter: drop-shadow(0 4px 12px rgba(108, 92, 231, 0.3));
 }
 
 .login-title {
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 700;
-  color: #1a1a2e;
+  background: linear-gradient(135deg, #ffffff, rgba(255, 255, 255, 0.85));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin-bottom: 8px;
   letter-spacing: -0.3px;
 }
 
 .login-subtitle {
   font-size: 14px;
-  color: #909399;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 400;
 }
 
 .login-form {
-  margin-top: 8px;
+  margin-top: 4px;
+}
+
+/* Override input styles for glassmorphism */
+.login-form :deep(.el-input__wrapper) {
+  background: rgba(255, 255, 255, 0.06) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1) inset !important;
+  border-radius: 10px !important;
+  height: 48px;
+  transition: all 0.2s ease;
+}
+.login-form :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2) inset !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+.login-form :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px var(--brand-400) inset, 0 0 0 3px rgba(108, 92, 231, 0.2) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+.login-form :deep(.el-input__inner) {
+  color: #ffffff !important;
+  font-size: 15px;
+}
+.login-form :deep(.el-input__inner::placeholder) {
+  color: rgba(255, 255, 255, 0.35) !important;
+}
+.login-form :deep(.el-input__prefix) {
+  color: rgba(255, 255, 255, 0.35) !important;
+}
+.login-form :deep(.el-input__suffix) {
+  color: rgba(255, 255, 255, 0.35) !important;
+}
+
+/* Form item spacing */
+.login-form :deep(.el-form-item) {
+  margin-bottom: 24px;
 }
 
 .login-btn {
   width: 100%;
-  height: 44px;
+  height: 48px;
   font-size: 16px;
   font-weight: 600;
   border-radius: 10px;
+  letter-spacing: 2px;
+  background: linear-gradient(135deg, var(--brand-500), var(--brand-400)) !important;
+  border: none !important;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 16px rgba(108, 92, 231, 0.3);
+}
+.login-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(108, 92, 231, 0.4);
+}
+.login-btn:active {
+  transform: translateY(0);
+}
+.login-btn :deep(.el-button__loading) {
+  color: #fff !important;
+}
+.login-btn :deep(.el-icon-loading) {
+  color: #fff;
+}
+
+.btn-text {
+  color: #ffffff;
 }
 
 .login-footer {
   text-align: center;
+  margin-top: -8px;
 }
 
 .hint-text {
   font-size: 12px;
-  color: #c0c4cc;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* ===== Footer bar ===== */
+.login-footer-bar {
+  position: absolute;
+  bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 13px;
+  z-index: 1;
+}
+.footer-dot {
+  opacity: 0.5;
+}
+
+/* ===== Dark mode overrides (login is always dark-themed) ===== */
+@media (prefers-color-scheme: light) {
+  .login-container {
+    background: linear-gradient(135deg, #0f0f1a 0%, #1a1240 30%, #2a2166 60%, #6C5CE7 100%);
+  }
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 480px) {
+  .login-card {
+    width: calc(100% - 32px);
+    padding: 32px 24px;
+    margin: 0 16px;
+  }
+  .login-title {
+    font-size: 22px;
+  }
+  .brand-badge {
+    top: 16px;
+    right: 16px;
+  }
+}
+
+/* ===== Accessibility ===== */
+@media (prefers-reduced-motion: reduce) {
+  .bg-orb,
+  .particle,
+  .login-card,
+  .login-container,
+  .logo,
+  .badge-dot {
+    animation: none !important;
+  }
 }
 </style>

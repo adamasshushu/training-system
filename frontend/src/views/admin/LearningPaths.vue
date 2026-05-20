@@ -1,47 +1,41 @@
 <template>
   <div class="learning-paths">
-    <el-card class="page-card">
-      <div class="page-header">
-        <h2>🗺️ 学习路径管理</h2>
-        <el-button type="primary" :icon="Plus" @click="showDialog(null)">新建学习路径</el-button>
-      </div>
+    <AdminTable
+      :data="paths"
+      :loading="loading"
+      :total="total"
+      v-model:model-value="page"
+      v-model:page-size="pageSize"
+      :columns="columns"
+      :show-search="false"
+      :show-index="true"
+      :actions-width="200"
+      @current-change="loadPaths"
+      @size-change="loadPaths"
+    >
+      <template #page-header>
+        <div class="page-header">
+          <h2 class="page-title">学习路径管理</h2>
+          <el-button type="primary" :icon="Plus" @click="showDialog(null)">新建学习路径</el-button>
+        </div>
+      </template>
 
-      <el-table :data="paths" v-loading="loading" stripe>
-        <el-table-column prop="ID" label="ID" width="60" />
-        <el-table-column prop="名称" label="路径名称" min-width="200" />
-        <el-table-column prop="描述" label="描述" min-width="250" show-overflow-tooltip />
-        <el-table-column prop="课程数量" label="课程数" width="80" />
-        <el-table-column label="发布" width="80">
-          <template #default="{ row }">
-            <el-tag :type="row.是否发布 ? 'success' : 'info'" size="small">
-              {{ row.是否发布 ? '已发布' : '草稿' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="创建时间" label="创建时间" width="180" />
-        <el-table-column label="操作" width="200" fixed="right">
-          <template #default="{ row }">
-            <el-button type="primary" link @click="showDialog(row)">编辑</el-button>
-            <el-button type="primary" link @click="manageCourses(row)">课程</el-button>
-            <el-popconfirm title="确定删除？" @confirm="deletePath(row)">
-              <template #reference>
-                <el-button type="danger" link>删除</el-button>
-              </template>
-            </el-popconfirm>
-          </template>
-        </el-table-column>
-      </el-table>
+      <template #column-发布="{ row }">
+        <el-tag :type="row.是否发布 ? 'success' : 'info'" size="small">
+          {{ row.是否发布 ? '已发布' : '草稿' }}
+        </el-tag>
+      </template>
 
-      <el-pagination
-        v-if="total > 0"
-        v-model:current-page="page"
-        :page-size="pageSize"
-        :total="total"
-        layout="prev, pager, next"
-        class="pagination"
-        @current-change="loadPaths"
-      />
-    </el-card>
+      <template #actions="{ row }">
+        <el-button text size="small" type="primary" @click="showDialog(row)">编辑</el-button>
+        <el-button text size="small" type="success" @click="manageCourses(row)">课程</el-button>
+        <el-popconfirm title="确定删除？" @confirm="deletePath(row)">
+          <template #reference>
+            <el-button text size="small" type="danger">删除</el-button>
+          </template>
+        </el-popconfirm>
+      </template>
+    </AdminTable>
 
     <!-- 编辑对话框 -->
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑学习路径' : '新建学习路径'" width="600px">
@@ -99,6 +93,7 @@ import { Plus, Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getToken } from '@/utils/auth'
 import axios from 'axios'
+import AdminTable from '@/components/AdminTable.vue'
 
 const API = axios.create({ baseURL: '' })
 API.interceptors.request.use((c) => { c.headers.Authorization = `Bearer ${getToken()}`; return c })
@@ -122,6 +117,14 @@ const selectedCourseId = ref(null)
 const newCourseRequired = ref(true)
 const savingCourses = ref(false)
 const currentPathId = ref(null)
+
+const columns = [
+  { prop: '名称', label: '路径名称', minWidth: 200 },
+  { prop: '描述', label: '描述', minWidth: 250, ellipsis: true },
+  { prop: '课程数量', label: '课程数', width: 80 },
+  { slot: 'column-发布', label: '发布', width: 80 },
+  { prop: '创建时间', label: '创建时间', width: 180 },
+]
 
 const loadPaths = async () => {
   loading.value = true
@@ -181,13 +184,11 @@ const manageCourses = async (row) => {
   selectedCourseId.value = null
   newCourseRequired.value = true
 
-  // 获取路径详情
   try {
     const res = await API.get(`/api/learning-paths/${row.ID}`)
     courseList.value = res.data.数据?.课程列表 || []
   } catch { courseList.value = [] }
 
-  // 获取可用课程
   try {
     const res = await API.get('/api/courses/student')
     availableCourses.value = (res.data.数据 || []).filter(
@@ -230,18 +231,17 @@ onMounted(loadPaths)
 
 <style scoped>
 .learning-paths { max-width: 1200px; margin: 0 auto; }
-.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.page-header h2 { margin: 0; font-size: 18px; color: #303133; }
-.pagination { margin-top: 16px; display: flex; justify-content: center; }
+.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.page-title { margin: 0; font-size: 22px; font-weight: 600; color: var(--text-primary); }
 .course-list { margin-bottom: 16px; }
 .course-item {
   display: flex; align-items: center; gap: 12px;
-  padding: 10px 12px; border: 1px solid #ebeef5;
+  padding: 10px 12px; border: 1px solid var(--border-default);
   border-radius: 6px; margin-bottom: 6px;
 }
 .course-sort {
   width: 24px; height: 24px; border-radius: 50%;
-  background: #409EFF; color: #fff; display: flex;
+  background: var(--info); color: var(--text-inverse); display: flex;
   align-items: center; justify-content: center; font-size: 12px;
 }
 .course-title { flex: 1; font-size: 14px; }

@@ -1,20 +1,19 @@
 <template>
   <div class="certs-page">
-    <div class="page-header">
-      <h2 class="page-title">证书管理</h2>
-      <el-button type="primary" @click="issueDialog=true"><el-icon><Plus /></el-icon>发放证书</el-button>
-    </div>
-
-    <el-card shadow="never">
-      <el-table :data="list" border stripe v-loading="loading">
-        <el-table-column type="index" label="#" width="55" />
-        <el-table-column prop="证书编号" label="证书编号" width="160" />
-        <el-table-column prop="持证人姓名" label="持证人" width="100" />
-        <el-table-column prop="用户姓名" label="系统用户" width="100" />
-        <el-table-column prop="模板名称" label="模板" min-width="140" />
-        <el-table-column prop="发放时间" label="发放时间" width="170" />
-      </el-table>
-    </el-card>
+    <AdminTable
+      :data="list"
+      :loading="loading"
+      :show-pagination="false"
+      :columns="columns"
+      :actions-width="0"
+    >
+      <template #page-header>
+        <div class="page-header">
+          <h2 class="page-title">证书管理</h2>
+          <el-button type="primary" @click="issueDialog=true"><el-icon><Plus /></el-icon>发放证书</el-button>
+        </div>
+      </template>
+    </AdminTable>
 
     <el-dialog v-model="issueDialog" title="发放证书" width="450px" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
@@ -46,6 +45,7 @@ import { Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getCertificates, issueCertificate, getTemplates } from '@/api/certificates'
 import request from '@/api/index'
+import AdminTable from '@/components/AdminTable.vue'
 
 const loading = ref(false); const list = ref([])
 const issueDialog = ref(false); const issuing = ref(false)
@@ -54,6 +54,14 @@ const users = ref([]); const templates = ref([])
 
 const form = reactive({ 用户ID:null, 模板ID:null, 证书编号:'' })
 const rules = { 用户ID:[{required:true,message:'请选择用户',trigger:'change'}] }
+
+const columns = [
+  { prop: '证书编号', label: '证书编号', width: 160 },
+  { prop: '持证人姓名', label: '持证人', width: 100 },
+  { prop: '用户姓名', label: '系统用户', width: 100 },
+  { prop: '模板名称', label: '模板', minWidth: 140 },
+  { prop: '发放时间', label: '发放时间', width: 170 },
+]
 
 const loadData = async () => {
   loading.value = true
@@ -84,5 +92,5 @@ onMounted(async () => {
 <style scoped>
 .certs-page { max-width:1200px }
 .page-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px }
-.page-title { font-size:22px; font-weight:600; color:#303133 }
+.page-title { font-size:22px; font-weight:600; color:var(--text-primary) }
 </style>

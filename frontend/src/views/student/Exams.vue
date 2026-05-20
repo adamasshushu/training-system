@@ -86,12 +86,12 @@ onMounted(() => loadData())
 <style scoped>
 .student-exams { max-width: 1200px; margin: 0 auto; padding: 24px; }
 .page-header { margin-bottom: 24px; }
-.page-header h2 { font-size: 24px; font-weight: 700; color: #303133; }
+.page-header h2 { font-size: 24px; font-weight: 700; color: var(--text-primary); }
 .exam-card { text-align: center; padding: 20px; border-radius: 12px; cursor: pointer; transition: all 0.2s; }
 .exam-card:hover { transform: translateY(-2px); }
 .exam-icon { margin-bottom: 16px; }
-.exam-card h3 { font-size: 18px; font-weight: 600; color: #303133; margin-bottom: 12px; }
+.exam-card h3 { font-size: 18px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px; }
 .exam-info { display: flex; justify-content: center; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
-.exam-info p { display: flex; align-items: center; gap: 4px; font-size: 13px; color: #909399; }
+.exam-info p { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text-tertiary); }
 .exam-btn { width: 100%; }
 </style>

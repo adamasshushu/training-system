@@ -1,156 +1,273 @@
 <template>
   <div class="lesson-player">
-    <!-- 顶部导航 -->
-    <div class="player-header">
-      <el-button text @click="goBack">
-        <el-icon><ArrowLeft /></el-icon>返回课程
-      </el-button>
-      <span class="course-title">{{ courseName }}</span>
-    </div>
+    <PageHeader :title="courseName" subtitle="课程学习">
+      <template #actions>
+        <el-button text @click="goBack">
+          <el-icon><ArrowLeft /></el-icon> 返回课程
+        </el-button>
+      </template>
+    </PageHeader>
 
-    <div class="player-body">
-      <!-- 课时内容区 -->
-      <div class="content-area">
-        <div class="lesson-title-bar">
-          <h2>{{ lessonTitle }}</h2>
-          <el-tag size="small" :type="lessonTypeTag(lessonType)" effect="plain">
-            {{ lessonTypeLabel }}
-          </el-tag>
-        </div>
-
-        <!-- 视频类型 - 带禁止加速播放功能 -->
+    <div class="player-layout">
+      <!-- Left: Main Content Area -->
+      <div class="player-main">
+        <!-- ========== Video Type ========== -->
         <div v-if="lessonType === 'video'" class="video-section">
-          <div class="video-container">
+          <!-- Video Player Wrapper -->
+          <div class="video-wrapper" ref="videoWrapperRef"
+            @mousemove="onWrapperMouseMove"
+            @mouseleave="onWrapperMouseLeave"
+          >
             <video
               ref="videoRef"
               :src="videoUrl"
-              :controlsList="disableFastForward ? 'nofullscreen noremoteplayback' : ''"
-              controls
               class="video-player"
-              @ratechange="onRateChange"
-              @loadedmetadata="onVideoLoaded"
+              preload="auto"
+              @loadedmetadata="onVideoMetaLoaded"
+              @timeupdate="onTimeUpdate"
+              @ended="onVideoEnded"
               @error="onVideoError"
+              @waiting="onBuffering"
+              @canplay="onCanPlay"
+              @ratechange="onRateChange"
               @contextmenu.prevent
-            >
-              您的浏览器不支持视频播放
-            </video>
+            ></video>
+
+            <!-- Buffering spinner -->
+            <transition name="fade">
+              <div v-if="isBuffering && videoUrl" class="video-buffering">
+                <el-icon class="loading-spinner" :size="36"><Loading /></el-icon>
+              </div>
+            </transition>
+
+            <!-- Placeholder when no video -->
             <div v-if="!videoUrl" class="video-placeholder">
               <el-icon :size="64" color="#a29bfe"><VideoCameraFilled /></el-icon>
               <p>暂无可播放视频</p>
             </div>
+
+            <!-- Center big play button (shown when paused) -->
+            <transition name="scale-fade">
+              <div v-if="videoUrl && !isPlaying" class="center-play-btn" @click="togglePlay">
+                <div class="center-play-circle">
+                  <el-icon :size="36" color="#fff"><VideoPlay /></el-icon>
+                </div>
+              </div>
+            </transition>
+
+            <!-- Bottom Control Bar -->
+            <transition name="slide-up">
+              <div v-if="videoUrl" class="control-bar" :class="{ visible: controlsVisible }">
+                <!-- Progress bar -->
+                <div class="progress-container">
+                  <div
+                    class="progress-track"
+                    ref="progressRef"
+                    @click="seekVideo"
+                    @mousedown="startDragging"
+                  >
+                    <div class="progress-buffered" :style="{ width: bufferedPercent + '%' }"></div>
+                    <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
+                    <div class="progress-thumb" :style="{ left: progressPercent + '%' }"></div>
+                  </div>
+                </div>
+
+                <!-- Control buttons row -->
+                <div class="controls-row">
+                  <div class="controls-left">
+                    <button class="ctrl-btn" @click="togglePlay" :title="isPlaying ? '暂停' : '播放'">
+                      <el-icon :size="20"><VideoPause v-if="isPlaying" /><VideoPlay v-else /></el-icon>
+                    </button>
+                    <span class="time-display">{{ formatTime(currentTime) }} / {{ formatTime(duration) }}</span>
+                  </div>
+
+                  <div class="controls-right">
+                    <!-- Volume -->
+                    <div class="volume-control"
+                      @mouseenter="volumeHover = true"
+                      @mouseleave="volumeHover = false"
+                    >
+                      <button class="ctrl-btn" @click="toggleMute" :title="isMuted ? '取消静音' : '静音'">
+                        <svg v-if="isMuted || volume === 0" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="color:#ef4444">
+                          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                          <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        <svg v-else viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                        </svg>
+                      </button>
+                      <div class="volume-slider-wrap" v-show="volumeHover">
+                        <div class="volume-slider" @click="onVolumeSliderClick">
+                          <div class="volume-fill" :style="{ height: volume * 100 + '%' }"></div>
+                          <div class="volume-thumb" :style="{ bottom: volume * 100 + '%' }"></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Speed -->
+                    <div class="speed-control"
+                      @mouseenter="speedMenuOpen = true"
+                      @mouseleave="speedMenuOpen = false"
+                    >
+                      <button class="ctrl-btn speed-btn">{{ playbackRate }}x</button>
+                      <transition name="fade">
+                        <div v-if="speedMenuOpen" class="speed-menu">
+                          <div
+                            v-for="speed in speedOptions"
+                            :key="speed"
+                            class="speed-option"
+                            :class="{ active: playbackRate === speed }"
+                            @click="setSpeed(speed)"
+                          >
+                            <span>{{ speed }}x</span>
+                            <el-icon v-if="playbackRate === speed" size="14" color="#6C5CE7"><Check /></el-icon>
+                          </div>
+                        </div>
+                      </transition>
+                    </div>
+
+                    <!-- Fullscreen -->
+                    <button class="ctrl-btn" @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏'">
+                      <el-icon :size="18" v-if="!isFullscreen"><FullScreen /></el-icon>
+                      <svg v-else viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                        <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </transition>
           </div>
-          <div class="video-controls">
-            <div class="speed-toggle">
-              <el-switch
-                v-model="disableFastForward"
-                active-color="#ef4444"
-                inactive-color="#6C5CE7"
-                @change="onToggleChange"
-              />
-              <span class="speed-label" :class="{ locked: disableFastForward }">
-                <el-icon :size="16" v-if="disableFastForward"><Lock /></el-icon>
-                <el-icon :size="16" v-else><Unlock /></el-icon>
-                {{ disableFastForward ? '禁止加速播放' : '允许加速播放' }}
-              </span>
+
+          <!-- Lesson info below video -->
+          <SectionCard class="lesson-meta-card">
+            <div class="lesson-meta-row">
+              <div class="lesson-meta-left">
+                <h2 class="lesson-title">{{ lessonTitle }}</h2>
+                <el-tag size="small" :type="lessonTypeTag(lessonType)" effect="plain">
+                  {{ lessonTypeLabel }}
+                </el-tag>
+              </div>
+              <div class="lesson-meta-actions">
+                <el-button
+                  type="primary"
+                  size="large"
+                  :loading="submitting"
+                  :disabled="isCompleted"
+                  @click="markComplete"
+                >
+                  <el-icon><Check /></el-icon>
+                  {{ isCompleted ? '已完成' : '完成学习' }}
+                </el-button>
+              </div>
             </div>
-            <div v-if="videoUrl" class="video-info">
-              <span class="video-hint">视频地址：{{ videoUrl }}</span>
-            </div>
-          </div>
+          </SectionCard>
         </div>
 
-        <!-- 文档类型 - PDF/PPT/Word在线预览 -->
-        <div v-else-if="lessonType === 'document'" class="document-section">
-          <div v-if="isPdf" class="pdf-viewer">
-            <iframe
-              :src="`/api/uploads/${docPath}?inline=1`"
-              class="pdf-frame"
-              frameborder="0"
-            ></iframe>
-          </div>
-          <div v-else-if="officeViewerUrl" class="office-viewer">
-            <iframe
-              :src="officeViewerUrl"
-              class="office-frame"
-              frameborder="0"
-              allowfullscreen
-            ></iframe>
-          </div>
-          <div v-else class="document-placeholder">
-            <el-icon :size="64" color="#10b981"><Document /></el-icon>
-            <p>暂不支持在线预览此文档类型</p>
-            <el-button type="primary" :icon="Download" @click="downloadDoc" class="doc-download-btn">
-              下载文件查看
-            </el-button>
-          </div>
-          <div class="doc-info" v-if="fileUrl">
+        <!-- ========== Document Type ========== -->
+        <div v-else-if="lessonType === 'document'" class="non-video-section">
+          <SectionCard title="文档预览" icon="📄">
+            <div v-if="isPdf" class="pdf-viewer">
+              <iframe :src="`/api/uploads/${docPath}?inline=1`" class="pdf-frame" frameborder="0"></iframe>
+            </div>
+            <div v-else-if="officeViewerUrl" class="office-viewer">
+              <iframe :src="officeViewerUrl" class="office-frame" frameborder="0" allowfullscreen></iframe>
+            </div>
+            <div v-else class="doc-placeholder">
+              <el-icon :size="56" color="#10b981"><Document /></el-icon>
+              <p>暂不支持在线预览此文档类型</p>
+              <el-button type="primary" :icon="Download" @click="downloadDoc">下载文件查看</el-button>
+            </div>
+          </SectionCard>
+          <div class="doc-info-bar" v-if="fileUrl">
             <el-icon><Link /></el-icon>
             <span class="doc-name">{{ fileUrl.split('/').pop() }}</span>
             <el-button text type="primary" :icon="Download" @click="downloadDoc">下载</el-button>
           </div>
+          <div class="action-bar">
+            <el-button type="primary" size="large" :loading="submitting" :disabled="isCompleted" @click="markComplete">
+              <el-icon><Check /></el-icon>
+              {{ isCompleted ? '已完成' : '完成学习' }}
+            </el-button>
+          </div>
         </div>
 
-        <!-- 图文类型 - Markdown渲染 -->
-        <div v-else-if="lessonType === 'text'" class="text-content">
-          <div class="text-body markdown-body" v-html="renderedMarkdown"></div>
+        <!-- ========== Text / Markdown Type ========== -->
+        <div v-else-if="lessonType === 'text'" class="non-video-section">
+          <SectionCard title="课程内容" icon="📖">
+            <div class="text-body markdown-body" v-html="renderedMarkdown"></div>
+          </SectionCard>
+          <div class="action-bar">
+            <el-button type="primary" size="large" :loading="submitting" :disabled="isCompleted" @click="markComplete">
+              <el-icon><Check /></el-icon>
+              {{ isCompleted ? '已完成' : '完成学习' }}
+            </el-button>
+          </div>
         </div>
 
-        <div v-else class="unknown-type">
-          <p>不支持的课时类型：{{ lessonType }}</p>
-        </div>
-
-        <!-- 完成学习按钮 -->
-        <div class="action-bar">
-          <el-button
-            type="primary"
-            size="large"
-            :loading="submitting"
-            :disabled="isCompleted"
-            @click="markComplete"
-          >
-            <el-icon><Check /></el-icon>
-            {{ isCompleted ? '已完成' : '完成学习' }}
-          </el-button>
+        <!-- ========== Unknown Type ========== -->
+        <div v-else class="non-video-section">
+          <SectionCard title="课时内容">
+            <div class="unknown-placeholder">
+              <p>不支持的课时类型：{{ lessonType }}</p>
+            </div>
+          </SectionCard>
         </div>
       </div>
 
-      <!-- 侧边导航 -->
-      <div class="lesson-nav">
-        <h3>课时列表</h3>
-        <div class="nav-chapters">
-          <div
-            v-for="(chapter, cIdx) in allChapters"
-            :key="chapter['ID'] || cIdx"
-            class="nav-chapter"
-          >
-            <div class="nav-chapter-title">第{{ cIdx + 1 }}章 {{ chapter['标题'] }}</div>
+      <!-- Right: Playlist Sidebar -->
+      <div class="player-sidebar">
+        <SectionCard title="课时列表" icon="📚">
+          <template #extra>
+            <span class="lesson-count">{{ totalLessons }} 个课时</span>
+          </template>
+          <div class="lesson-list">
             <div
-              v-for="(les, lIdx) in chapter['课时列表']"
-              :key="les['ID'] || lIdx"
-              class="nav-lesson"
-              :class="{
-                active: les['ID'] === currentLessonId,
-                completed: les['是否完成']
-              }"
-              @click="navigateToLesson(les['ID'])"
+              v-for="(chapter, cIdx) in allChapters"
+              :key="chapter['ID'] || cIdx"
+              class="chapter-group"
             >
-              <el-icon v-if="les['是否完成']" color="#10b981" size="14"><SuccessFilled /></el-icon>
-              <el-icon v-else size="14">
-                <VideoPlay v-if="les['课时类型'] === 'video'" />
-                <Document v-else-if="les['课时类型'] === 'document'" />
-                <Reading v-else />
-              </el-icon>
-              <span>{{ les['标题'] }}</span>
+              <div class="chapter-title">
+                第{{ cIdx + 1 }}章 {{ chapter['标题'] }}
+              </div>
+              <div
+                v-for="(les, lIdx) in chapter['课时列表']"
+                :key="les['ID'] || lIdx"
+                class="lesson-item"
+                :class="{
+                  active: les['ID'] === currentLessonId,
+                  completed: les['是否完成']
+                }"
+                @click="navigateToLesson(les['ID'])"
+              >
+                <div class="lesson-item-icon">
+                  <el-icon v-if="les['是否完成']" color="#10b981" size="16"><SuccessFilled /></el-icon>
+                  <el-icon v-else size="16" color="var(--text-tertiary)">
+                    <VideoPlay v-if="les['课时类型'] === 'video'" />
+                    <Document v-else-if="les['课时类型'] === 'document'" />
+                    <Reading v-else />
+                  </el-icon>
+                </div>
+                <div class="lesson-item-content">
+                  <span class="lesson-item-title">{{ les['标题'] }}</span>
+                  <span class="lesson-item-type">{{ les['课时类型'] === 'video' ? '视频' : les['课时类型'] === 'document' ? '文档' : '图文' }}</span>
+                </div>
+                <div v-if="les['ID'] === currentLessonId" class="lesson-item-indicator"></div>
+              </div>
+            </div>
+            <div v-if="allChapters.length === 0" class="lesson-list-empty">
+              <el-icon :size="32" color="var(--text-tertiary)"><Folder /></el-icon>
+              <p>暂无课时列表</p>
             </div>
           </div>
-        </div>
+        </SectionCard>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { marked } from 'marked'
@@ -165,7 +282,11 @@ import {
   Lock,
   Unlock,
   Download,
-  Link
+  Link,
+  VideoPause,
+  Loading,
+  FullScreen,
+  Folder
 } from '@element-plus/icons-vue'
 import { getCourseDetail, updateProgress } from '@/api/courses'
 
@@ -187,6 +308,44 @@ const submitting = ref(false)
 // Video player state
 const videoRef = ref(null)
 const disableFastForward = ref(false)
+
+// --- New video player control state ---
+const videoWrapperRef = ref(null)
+const progressRef = ref(null)
+const isPlaying = ref(false)
+const currentTime = ref(0)
+const duration = ref(0)
+const volume = ref(1)
+const isMuted = ref(false)
+const playbackRate = ref(1)
+const controlsVisible = ref(true)
+const isBuffering = ref(false)
+const volumeHover = ref(false)
+const speedMenuOpen = ref(false)
+const isFullscreen = ref(false)
+const isDragging = ref(false)
+const buffered = ref(0)
+const hideControlsTimer = ref(null)
+
+const speedOptions = [0.5, 0.75, 1, 1.25, 1.5, 2]
+
+const totalLessons = computed(() => {
+  let count = 0
+  for (const ch of allChapters.value) {
+    count += (ch['课时列表'] || []).length
+  }
+  return count
+})
+
+const progressPercent = computed(() => {
+  if (!duration.value) return 0
+  return (currentTime.value / duration.value) * 100
+})
+
+const bufferedPercent = computed(() => {
+  if (!duration.value) return 0
+  return (buffered.value / duration.value) * 100
+})
 
 const lessonTypeLabel = computed(() => {
   const map = { video: '视频', document: '文档', text: '图文' }
@@ -215,7 +374,6 @@ const isPdf = computed(() => {
 
 const docPath = computed(() => {
   if (!fileUrl.value) return ''
-  // fileUrl might be a path like "videos/xxx.mp4" or full URL
   const path = fileUrl.value.replace(/^\/api\/uploads\//, '')
   return path
 })
@@ -225,7 +383,6 @@ const officeViewerUrl = computed(() => {
   const ext = fileUrl.value.toLowerCase().split('.').pop()
   const officeExts = ['doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx']
   if (!officeExts.includes(ext)) return ''
-  // Use Microsoft Office Online viewer
   const fileUrl_full = `${window.location.origin}/api/uploads/${docPath.value}`
   return `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(fileUrl_full)}`
 })
@@ -257,6 +414,8 @@ const loadLesson = () => {
     videoUrl.value = lesson['视频地址'] || ''
     fileUrl.value = lesson['文件地址'] || lesson['file_url'] || ''
     isCompleted.value = !!lesson['是否完成']
+    // Reset video player state when lesson changes
+    resetPlayer()
   } else {
     lessonTitle.value = '课时未找到'
     lessonType.value = ''
@@ -283,7 +442,6 @@ const markComplete = async () => {
     })
     ElMessage.success('学习进度已保存')
     isCompleted.value = true
-    // Update local state
     for (const ch of allChapters.value) {
       const lessons = ch['课时列表'] || []
       for (const les of lessons) {
@@ -310,7 +468,7 @@ const fetchData = async () => {
   }
 }
 
-// Video player methods
+// --- Original video player methods ---
 const onRateChange = () => {
   if (disableFastForward.value && videoRef.value) {
     if (videoRef.value.playbackRate > 1) {
@@ -335,146 +493,740 @@ const onToggleChange = (val) => {
   }
 }
 
-// Keyboard shortcuts to prevent speed changes
 const handleKeyDown = (e) => {
   if (!disableFastForward.value) return
-  // ArrowUp/ArrowDown for volume is fine, but prevent speed changes
-  // '>' and '.' keys for speed increase, '<' and ',' for speed decrease
   if (e.key === '>' || e.key === '.' || e.key === '<' || e.key === ',') {
     e.preventDefault()
   }
 }
 
+// --- New video player control methods ---
+
+const resetPlayer = () => {
+  isPlaying.value = false
+  currentTime.value = 0
+  duration.value = 0
+  buffered.value = 0
+  isBuffering.value = false
+  playbackRate.value = 1
+  controlsVisible.value = true
+}
+
+const formatTime = (seconds) => {
+  if (!seconds || isNaN(seconds)) return '0:00'
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = Math.floor(seconds % 60)
+  const pad = (n) => n.toString().padStart(2, '0')
+  if (h > 0) return `${h}:${pad(m)}:${pad(s)}`
+  return `${m}:${pad(s)}`
+}
+
+const togglePlay = () => {
+  if (!videoRef.value) return
+  if (videoRef.value.paused) {
+    videoRef.value.play().catch(() => {})
+    isPlaying.value = true
+  } else {
+    videoRef.value.pause()
+    isPlaying.value = false
+  }
+}
+
+const toggleMute = () => {
+  if (!videoRef.value) return
+  videoRef.value.muted = !videoRef.value.muted
+  isMuted.value = videoRef.value.muted
+}
+
+const onVolumeSliderClick = (e) => {
+  if (!videoRef.value) return
+  const rect = e.currentTarget.getBoundingClientRect()
+  const y = rect.bottom - e.clientY
+  const h = rect.height
+  const val = Math.max(0, Math.min(1, y / h))
+  volume.value = val
+  videoRef.value.volume = val
+  if (val > 0 && videoRef.value.muted) {
+    videoRef.value.muted = false
+    isMuted.value = false
+  }
+}
+
+const seekVideo = (e) => {
+  if (!videoRef.value || !duration.value) return
+  const rect = e.currentTarget.getBoundingClientRect()
+  const x = e.clientX - rect.left
+  const percent = x / rect.width
+  const time = percent * duration.value
+  videoRef.value.currentTime = time
+  currentTime.value = time
+}
+
+const startDragging = (e) => {
+  isDragging.value = true
+  document.addEventListener('mousemove', onDragging)
+  document.addEventListener('mouseup', stopDragging)
+}
+
+const onDragging = (e) => {
+  if (!videoRef.value || !duration.value || !progressRef.value) return
+  const rect = progressRef.value.getBoundingClientRect()
+  const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width))
+  const percent = x / rect.width
+  const time = percent * duration.value
+  currentTime.value = time
+  videoRef.value.currentTime = time
+}
+
+const stopDragging = () => {
+  isDragging.value = false
+  document.removeEventListener('mousemove', onDragging)
+  document.removeEventListener('mouseup', stopDragging)
+}
+
+const setSpeed = (speed) => {
+  if (!videoRef.value) return
+  videoRef.value.playbackRate = speed
+  playbackRate.value = speed
+  speedMenuOpen.value = false
+}
+
+const toggleFullscreen = async () => {
+  if (!videoWrapperRef.value) return
+  if (!document.fullscreenElement) {
+    try {
+      await videoWrapperRef.value.requestFullscreen()
+      isFullscreen.value = true
+    } catch { /* ignore */ }
+  } else {
+    try {
+      await document.exitFullscreen()
+      isFullscreen.value = false
+    } catch { /* ignore */ }
+  }
+}
+
+const onVideoMetaLoaded = () => {
+  if (videoRef.value) {
+    duration.value = videoRef.value.duration
+    volume.value = videoRef.value.volume
+  }
+  // Call original handler
+  onVideoLoaded()
+}
+
+const onTimeUpdate = () => {
+  if (videoRef.value && !isDragging.value) {
+    currentTime.value = videoRef.value.currentTime
+  }
+}
+
+const onVideoEnded = () => {
+  isPlaying.value = false
+}
+
+const onBuffering = () => {
+  isBuffering.value = true
+}
+
+const onCanPlay = () => {
+  isBuffering.value = false
+  if (videoRef.value) {
+    try {
+      buffered.value = videoRef.value.buffered.length > 0
+        ? videoRef.value.buffered.end(videoRef.value.buffered.length - 1)
+        : 0
+    } catch { /* ignore */ }
+  }
+}
+
+const showControls = () => {
+  controlsVisible.value = true
+  clearTimeout(hideControlsTimer.value)
+}
+
+const hideControls = () => {
+  if (isPlaying.value) {
+    hideControlsTimer.value = setTimeout(() => {
+      controlsVisible.value = false
+    }, 3000)
+  }
+}
+
+const onWrapperMouseMove = () => {
+  controlsVisible.value = true
+  clearTimeout(hideControlsTimer.value)
+  if (isPlaying.value) {
+    hideControlsTimer.value = setTimeout(() => {
+      controlsVisible.value = false
+    }, 3000)
+  }
+}
+
+const onWrapperMouseLeave = () => {
+  if (isPlaying.value) {
+    hideControlsTimer.value = setTimeout(() => {
+      controlsVisible.value = false
+    }, 2000)
+  }
+}
+
+// Keyboard shortcuts
+const onKeyDown = (e) => {
+  // Only handle when video is active
+  if (lessonType.value !== 'video') return
+
+  switch (e.code) {
+    case 'Space':
+      e.preventDefault()
+      togglePlay()
+      break
+    case 'KeyF':
+      e.preventDefault()
+      toggleFullscreen()
+      break
+    case 'ArrowLeft':
+      if (videoRef.value) {
+        videoRef.value.currentTime = Math.max(0, videoRef.value.currentTime - 5)
+      }
+      break
+    case 'ArrowRight':
+      if (videoRef.value) {
+        videoRef.value.currentTime = Math.min(duration.value, videoRef.value.currentTime + 5)
+      }
+      break
+    case 'ArrowUp':
+      e.preventDefault()
+      if (videoRef.value) {
+        volume.value = Math.min(1, volume.value + 0.1)
+        videoRef.value.volume = volume.value
+      }
+      break
+    case 'ArrowDown':
+      e.preventDefault()
+      if (videoRef.value) {
+        volume.value = Math.max(0, volume.value - 0.1)
+        videoRef.value.volume = volume.value
+      }
+      break
+    case 'KeyM':
+      toggleMute()
+      break
+  }
+}
+
+// Fullscreen change listener
+const onFullscreenChange = () => {
+  isFullscreen.value = !!document.fullscreenElement
+}
+
 onMounted(() => {
   fetchData()
   window.addEventListener('keydown', handleKeyDown)
+  window.addEventListener('keydown', onKeyDown)
+  document.addEventListener('fullscreenchange', onFullscreenChange)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeyDown)
+  window.removeEventListener('keydown', onKeyDown)
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
+  clearTimeout(hideControlsTimer.value)
 })
 </script>
 
 <style scoped>
+/* ===== Layout ===== */
 .lesson-player {
-  max-width: 1200px;
+  max-width: 1240px;
   margin: 0 auto;
-  padding: 16px 24px;
+  padding: 20px 24px 40px;
 }
 
-.player-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.course-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #1a1a2e;
-}
-
-.player-body {
+.player-layout {
   display: flex;
   gap: 24px;
+  align-items: flex-start;
 }
 
-.content-area {
+.player-main {
   flex: 1;
   min-width: 0;
 }
 
-.lesson-title-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
+.player-sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 20px;
 }
 
-.lesson-title-bar h2 {
-  font-size: 22px;
-  font-weight: 700;
-  color: #1a1a2e;
-  margin: 0;
-  letter-spacing: -0.3px;
-}
-
-/* Video section */
+/* ===== Video Player ===== */
 .video-section {
-  margin-bottom: 20px;
+  margin-bottom: 0;
 }
 
-.video-container {
+.video-wrapper {
   position: relative;
   width: 100%;
+  aspect-ratio: 16 / 9;
   background: #0f0f1a;
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
-  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  border: 1px solid var(--border-default);
 }
 
 .video-player {
   width: 100%;
+  height: 100%;
   display: block;
-  max-height: 480px;
+  object-fit: contain;
   background: #0f0f1a;
 }
 
-.video-placeholder,
-.document-placeholder,
-.unknown-type {
+/* Placeholder */
+.video-placeholder {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 360px;
-  background: #f8f9ff;
-  border-radius: 12px;
-  color: #94a3b8;
   gap: 12px;
-  margin-bottom: 20px;
-  border: 1px solid #e2e8f0;
+  color: var(--text-tertiary);
+  background: #0f0f1a;
+}
+.video-placeholder p {
+  font-size: 15px;
+  margin: 0;
 }
 
-.document-section {
+/* Buffering */
+.video-buffering {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 15, 26, 0.5);
+  z-index: 5;
+}
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Center play button */
+.center-play-btn {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 6;
+  cursor: pointer;
+}
+.center-play-circle {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(108, 92, 231, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s, background 0.2s;
+  backdrop-filter: blur(4px);
+}
+.center-play-circle:hover {
+  transform: scale(1.08);
+  background: rgba(108, 92, 231, 1);
+}
+
+/* Control bar */
+.control-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+  padding: 40px 16px 10px;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.control-bar.visible {
+  opacity: 1;
+}
+
+/* Progress bar */
+.progress-container {
+  padding: 4px 0;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+.progress-track {
+  position: relative;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: height 0.15s;
+}
+.progress-track:hover {
+  height: 6px;
+}
+.progress-buffered {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  transition: width 0.2s;
+}
+.progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: #6C5CE7;
+  border-radius: 2px;
+  transition: width 0.1s linear;
+}
+.progress-thumb {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #6C5CE7;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+.progress-track:hover .progress-thumb {
+  opacity: 1;
+}
+
+/* Controls row */
+.controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.controls-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.controls-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Control buttons */
+.ctrl-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  transition: background 0.15s;
+  font-size: 13px;
+}
+.ctrl-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.time-display {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+.speed-btn {
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 36px;
+  letter-spacing: 0.3px;
+}
+
+/* Volume control */
+.volume-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.volume-slider-wrap {
+  position: absolute;
+  bottom: 36px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30, 30, 50, 0.95);
+  border-radius: 8px;
+  padding: 8px 6px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.volume-slider {
+  position: relative;
+  width: 4px;
+  height: 80px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.volume-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: #6C5CE7;
+  border-radius: 2px;
+  transition: height 0.1s;
+}
+.volume-thumb {
+  position: absolute;
+  left: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translate(-50%, 50%);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+/* Speed selector */
+.speed-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.speed-menu {
+  position: absolute;
+  bottom: 36px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30, 30, 50, 0.95);
+  border-radius: 10px;
+  padding: 4px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  min-width: 72px;
+  z-index: 20;
+}
+.speed-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.speed-option:hover {
+  background: rgba(108, 92, 231, 0.2);
+  color: #fff;
+}
+.speed-option.active {
+  color: #6C5CE7;
+  font-weight: 600;
+}
+
+/* ===== Lesson Meta Card ===== */
+.lesson-meta-card {
+  margin-top: 16px;
+}
+.lesson-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.lesson-meta-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+.lesson-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lesson-meta-actions {
+  flex-shrink: 0;
+}
+
+/* ===== Sidebar / Playlist ===== */
+.lesson-count {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+.lesson-list {
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.lesson-list::-webkit-scrollbar {
+  width: 4px;
+}
+.lesson-list::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 2px;
+}
+
+.chapter-group {
+  margin-bottom: 10px;
+}
+.chapter-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  padding: 6px 4px 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.lesson-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s, transform 0.1s;
+  position: relative;
+}
+.lesson-item:hover {
+  background: var(--bg-hover);
+}
+.lesson-item.active {
+  background: rgba(108, 92, 231, 0.08);
+  border-left: 3px solid #6C5CE7;
+  padding-left: 7px;
+}
+.lesson-item.completed .lesson-item-title {
+  color: #10b981;
+}
+
+.lesson-item-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  width: 20px;
+  justify-content: center;
+}
+
+.lesson-item-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.lesson-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+.lesson-item-type {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+.lesson-item-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6C5CE7;
+  flex-shrink: 0;
+}
+
+.lesson-list-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 32px 0;
+  color: var(--text-tertiary);
+}
+.lesson-list-empty p {
+  margin: 0;
+  font-size: 13px;
+}
+
+/* ===== Non-video sections ===== */
+.non-video-section {
   margin-bottom: 20px;
 }
 
 .pdf-viewer,
 .office-viewer {
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
-  border: 1px solid #e2e8f0;
-  margin-bottom: 12px;
+  border: 1px solid var(--border-default);
 }
-
 .pdf-frame {
   width: 100%;
   height: 600px;
   display: block;
 }
-
 .office-frame {
   width: 100%;
   height: 500px;
   display: block;
 }
 
-.doc-info {
+.doc-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 0;
+  color: var(--text-tertiary);
+}
+.doc-placeholder p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.doc-info-bar {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  background: #f8f9ff;
+  background: var(--bg-hover);
   border-radius: 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-default);
   font-size: 13px;
-  color: #64748b;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
 }
-
 .doc-name {
   flex: 1;
   overflow: hidden;
@@ -482,78 +1234,38 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.doc-download-btn {
-  margin-top: 4px;
+.unknown-placeholder {
+  padding: 32px 0;
+  text-align: center;
+  color: var(--text-tertiary);
 }
-
-.video-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 12px;
-  padding: 10px 16px;
-  background: #f8f9ff;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
-}
-
-.speed-toggle {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.speed-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.unknown-placeholder p {
+  margin: 0;
   font-size: 14px;
-  font-weight: 500;
-  color: #64748b;
 }
 
-.speed-label.locked {
-  color: #ef4444;
-}
-
-.video-info {
-  font-size: 12px;
-  color: #94a3b8;
-  max-width: 50%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.video-hint {
-  font-size: 13px;
-  color: #94a3b8;
-}
-
-.text-content {
-  background: #fff;
-  border-radius: 12px;
-  padding: 24px;
-  border: 1px solid #e2e8f0;
-  margin-bottom: 20px;
-  min-height: 300px;
+.action-bar {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0 0;
 }
 
 .text-body {
   line-height: 1.8;
-  color: #1a1a2e;
+  color: var(--text-primary);
+  padding: 4px 0;
 }
 
-/* Markdown 样式 */
-.markdown-body h1 { font-size: 24px; font-weight: 700; margin: 24px 0 12px; color: #1a1a2e; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }
-.markdown-body h2 { font-size: 20px; font-weight: 700; margin: 20px 0 10px; color: #1a1a2e; }
-.markdown-body h3 { font-size: 17px; font-weight: 600; margin: 16px 0 8px; color: #334155; }
-.markdown-body h4 { font-size: 15px; font-weight: 600; margin: 12px 0 6px; color: #475569; }
+/* Markdown styles */
+.markdown-body h1 { font-size: 24px; font-weight: 700; margin: 24px 0 12px; color: var(--text-primary); border-bottom: 1px solid var(--border-default); padding-bottom: 8px; }
+.markdown-body h2 { font-size: 20px; font-weight: 700; margin: 20px 0 10px; color: var(--text-primary); }
+.markdown-body h3 { font-size: 17px; font-weight: 600; margin: 16px 0 8px; color: var(--text-primary); }
+.markdown-body h4 { font-size: 15px; font-weight: 600; margin: 12px 0 6px; color: var(--text-secondary); }
 .markdown-body p { margin: 8px 0; line-height: 1.8; }
 .markdown-body ul, .markdown-body ol { margin: 8px 0; padding-left: 24px; }
 .markdown-body li { margin: 4px 0; line-height: 1.7; }
 .markdown-body code {
-  background: #f1f5f9;
+  background: var(--bg-hover);
   color: #6C5CE7;
   padding: 2px 6px;
   border-radius: 4px;
@@ -580,9 +1292,9 @@ onBeforeUnmount(() => {
   border-left: 4px solid #6C5CE7;
   padding: 8px 16px;
   margin: 12px 0;
-  background: #f8f9ff;
+  background: var(--bg-hover);
   border-radius: 0 8px 8px 0;
-  color: #475569;
+  color: var(--text-secondary);
 }
 .markdown-body table {
   width: 100%;
@@ -591,13 +1303,13 @@ onBeforeUnmount(() => {
 }
 .markdown-body th, .markdown-body td {
   padding: 8px 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-default);
   text-align: left;
 }
 .markdown-body th {
-  background: #f8fafc;
+  background: var(--bg-hover);
   font-weight: 600;
-  color: #334155;
+  color: var(--text-primary);
 }
 .markdown-body img {
   max-width: 100%;
@@ -613,89 +1325,75 @@ onBeforeUnmount(() => {
 }
 .markdown-body hr {
   border: none;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--border-default);
   margin: 24px 0;
 }
 
-.action-bar {
-  display: flex;
-  justify-content: center;
-  padding: 20px 0;
+/* ===== Transitions ===== */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
 }
 
-.lesson-nav {
-  width: 280px;
-  flex-shrink: 0;
-  background: #fff;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  padding: 16px;
-  max-height: calc(100vh - 120px);
-  overflow-y: auto;
+.scale-fade-enter-active, .scale-fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.scale-fade-enter-from, .scale-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.8);
 }
 
-.lesson-nav h3 {
-  font-size: 15px;
-  font-weight: 600;
-  color: #1a1a2e;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #e2e8f0;
+.slide-up-enter-active, .slide-up-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.slide-up-enter-from, .slide-up-leave-to {
+  opacity: 0;
+  transform: translateY(16px);
 }
 
-.nav-chapter {
-  margin-bottom: 12px;
-}
-
-.nav-chapter-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #475569;
-  margin-bottom: 6px;
-  padding-left: 4px;
-}
-
-.nav-lesson {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  cursor: pointer;
-  border-radius: 6px;
-  font-size: 13px;
-  color: #64748b;
-  transition: background 0.2s;
-}
-
-.nav-lesson:hover {
-  background: #f8f9ff;
-}
-
-.nav-lesson.active {
-  background: #eef0ff;
-  color: #6C5CE7;
-  font-weight: 500;
-}
-
-.nav-lesson.completed {
-  color: #10b981;
-}
-
-/* Mobile responsive */
-@media (max-width: 768px) {
-  .player-body {
+/* ===== Responsive ===== */
+@media (max-width: 960px) {
+  .player-layout {
     flex-direction: column;
   }
-  .lesson-nav {
+  .player-sidebar {
     width: 100%;
-    max-height: none;
+    position: static;
+    margin-top: 20px;
   }
-  .video-controls {
+  .lesson-list {
+    max-height: 400px;
+  }
+}
+
+@media (max-width: 640px) {
+  .lesson-player {
+    padding: 12px 12px 32px;
+  }
+  .lesson-meta-row {
     flex-direction: column;
-    gap: 8px;
+    align-items: flex-start;
   }
-  .video-info {
-    max-width: 100%;
+  .lesson-title {
+    font-size: 16px;
+  }
+  .control-bar {
+    padding: 32px 10px 8px;
+  }
+  .center-play-circle {
+    width: 56px;
+    height: 56px;
+  }
+  .controls-right {
+    gap: 2px;
+  }
+  .volume-control {
+    display: none;
+  }
+  .time-display {
+    font-size: 11px;
   }
 }
 </style>

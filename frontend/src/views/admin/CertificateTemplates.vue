@@ -1,28 +1,32 @@
 <template>
   <div class="templates-page">
-    <div class="page-header">
-      <h2 class="page-title">证书模板</h2>
-      <el-button type="primary" @click="handleAdd"><el-icon><Plus /></el-icon>新建模板</el-button>
-    </div>
+    <AdminTable
+      :data="list"
+      :loading="loading"
+      :total="total"
+      v-model:model-value="page"
+      :page-size="20"
+      :show-pagination="false"
+      :columns="columns"
+      title="证书模板"
+      :show-search="false"
+    >
+      <template #page-header>
+        <div class="page-header">
+          <h2 class="page-title">证书模板</h2>
+          <el-button type="primary" @click="handleAdd"><el-icon><Plus /></el-icon>新建模板</el-button>
+        </div>
+      </template>
 
-    <el-card shadow="never">
-      <el-table :data="list" border stripe v-loading="loading">
-        <el-table-column type="index" label="#" width="55" />
-        <el-table-column prop="名称" label="模板名称" min-width="200" />
-        <el-table-column prop="背景图" label="背景图" min-width="200" show-overflow-tooltip />
-        <el-table-column label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="row.是否激活?'success':'info'" size="small">{{ row.是否激活?'启用':'停用' }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="160">
-          <template #default="{ row }">
-            <el-button text size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
-            <el-button text size="small" type="danger" @click="handleDelete(row)" v-if="row.是否激活">停用</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+      <template #column-状态="{ row }">
+        <el-tag :type="row.是否激活?'success':'info'" size="small">{{ row.是否激活?'启用':'停用' }}</el-tag>
+      </template>
+
+      <template #actions="{ row }">
+        <el-button text size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
+        <el-button text size="small" type="danger" @click="handleDelete(row)" v-if="row.是否激活">停用</el-button>
+      </template>
+    </AdminTable>
 
     <el-dialog v-model="dialogVisible" :title="isEdit?'编辑模板':'新建模板'" width="500px" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="80px">
@@ -49,16 +53,24 @@ import { ref, reactive, onMounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTemplates, createTemplate, updateTemplate, deleteTemplate } from '@/api/certificates'
+import AdminTable from '@/components/AdminTable.vue'
 
 const loading = ref(false); const list = ref([])
+const total = ref(0); const page = ref(1)
 const dialogVisible = ref(false); const isEdit = ref(false)
 const submitting = ref(false); const formRef = ref(null); const editId = ref(null)
 const form = reactive({ 名称:'', 背景图:'', 样式配置:'' })
 const rules = { 名称:[{required:true,message:'请输入名称',trigger:'blur'}] }
 
+const columns = [
+  { prop: '名称', label: '模板名称', minWidth: 200 },
+  { prop: '背景图', label: '背景图', minWidth: 200, ellipsis: true },
+  { slot: 'column-状态', label: '状态', width: 100 },
+]
+
 const loadData = async () => {
   loading.value = true
-  try { const r = await getTemplates(); list.value = r.数据||[] } catch {} finally { loading.value = false }
+  try { const r = await getTemplates(); list.value = r.数据||[]; total.value = list.value.length } catch {} finally { loading.value = false }
 }
 
 const handleAdd = () => {
@@ -95,5 +107,5 @@ onMounted(() => loadData())
 <style scoped>
 .templates-page { max-width:1200px }
 .page-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px }
-.page-title { font-size:22px; font-weight:600; color:#303133 }
+.page-title { font-size:22px; font-weight:600; color:var(--text-primary) }
 </style>

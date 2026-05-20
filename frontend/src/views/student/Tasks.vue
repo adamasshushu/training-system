@@ -28,7 +28,7 @@
     <!-- 详情弹窗 -->
     <el-dialog v-model="detailDialog" :title="detailTask.标题" width="600px">
       <div v-loading="detailLoading">
-        <p style="color:#909399;margin-bottom:16px">{{ detailTask.描述 || '暂无描述' }}</p>
+        <p style="color:var(--text-tertiary);margin-bottom:16px">{{ detailTask.描述 || '暂无描述' }}</p>
         <el-progress :percentage="detailProgress.总进度" :color="detailProgress.总进度===100?'#67C23A':'#409EFF'" :stroke-width="20" style="margin-bottom:20px">
           <template #default="{ percentage }">{{ percentage }}%</template>
         </el-progress>
@@ -106,16 +106,16 @@ onMounted(() => loadData())
 <style scoped>
 .student-tasks { max-width: 1200px; margin: 0 auto; padding: 24px; }
 .page-header { margin-bottom: 24px; }
-.page-header h2 { font-size: 24px; font-weight: 700; color: #303133; }
+.page-header h2 { font-size: 24px; font-weight: 700; color: var(--text-primary); }
 .task-card { margin-bottom: 16px; border-radius: 12px; cursor: pointer; transition: all 0.2s; }
 .task-card:hover { transform: translateY(-2px); }
 .task-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.task-header h3 { font-size: 18px; font-weight: 600; color: #303133; }
-.task-desc { color: #909399; font-size: 14px; margin-bottom: 12px; }
-.task-meta { display: flex; gap: 24px; font-size: 13px; color: #909399; margin-bottom: 12px; }
+.task-header h3 { font-size: 18px; font-weight: 600; color: var(--text-primary); }
+.task-desc { color: var(--text-tertiary); font-size: 14px; margin-bottom: 12px; }
+.task-meta { display: flex; gap: 24px; font-size: 13px; color: var(--text-tertiary); margin-bottom: 12px; }
 .progress-area { display: flex; align-items: center; gap: 16px; }
-.progress-text { font-size: 13px; color: #606266; white-space: nowrap; }
+.progress-text { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
 .progress-item { margin-bottom: 12px; }
 .progress-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 14px; }
-.progress-detail { font-size: 12px; color: #909399; }
+.progress-detail { font-size: 12px; color: var(--text-tertiary); }
 </style>

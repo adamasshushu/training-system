@@ -1,7 +1,7 @@
 <template>
   <div class="admin-feedback">
     <el-card class="page-card">
-      <h2 style="margin: 0 0 20px; font-size: 18px">📊 培训反馈管理</h2>
+      <h2 style="margin: 0 0 20px; font-size: 18px; color: var(--text-primary)">📊 培训反馈管理</h2>
 
       <el-row :gutter="16" style="margin-bottom: 20px">
         <el-col :span="6">
@@ -24,7 +24,8 @@
         </el-col>
       </el-row>
 
-      <el-table :data="feedbackList" v-loading="loading" stripe>
+      <el-table :data="feedbackList" v-loading="loading" border stripe>
+        <el-table-column type="index" label="#" width="55" />
         <el-table-column prop="用户" label="提交人" width="120" />
         <el-table-column label="内容评分" width="120">
           <template #default="{ row }">
@@ -45,7 +46,7 @@
         v-model:current-page="page"
         :page-size="pageSize"
         :total="total"
-        layout="prev, pager, next"
+        layout="total, prev, pager, next"
         class="pagination"
         @current-change="loadFeedback"
       />
@@ -87,7 +88,7 @@ onMounted(loadFeedback)
 <style scoped>
 .admin-feedback { max-width: 1000px; margin: 0 auto; }
 .stat-small { text-align: center; }
-.stat-num { font-size: 28px; font-weight: 700; color: #409EFF; }
-.stat-label { font-size: 12px; color: #909399; margin-top: 2px; }
-.pagination { margin-top: 16px; display: flex; justify-content: center; }
+.stat-num { font-size: 28px; font-weight: 700; color: var(--info); }
+.stat-label { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
+.pagination { margin-top: 16px; display: flex; justify-content: flex-end; }
 </style>
