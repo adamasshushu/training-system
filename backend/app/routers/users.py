@@ -7,7 +7,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.department import Department
 from app.utils.auth import get_password_hash, get_current_user
-from app.schemas.user import UserCreate, UserUpdate, UserResponse
+from app.schemas.user import UserCreate, UserUpdate, UserPasswordReset, UserResponse
 
 router = APIRouter(prefix="/api/users", tags=["用户管理"])
 
@@ -168,3 +168,42 @@ async def delete_user(
     user.is_active = False
     await db.flush()
     return {"message": "用户已停用", "labels": {"message": "消息"}}
+
+
+@router.put("/{user_id}/password")
+async def reset_user_password(
+    user_id: int,
+    req: UserPasswordReset,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """管理员重置用户密码"""
+    if current_user.get("角色") != "admin":
+        raise HTTPException(status_code=403, detail="仅管理员可重置密码")
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    user.password_hash = get_password_hash(req.新密码)
+    await db.flush()
+    return {"message": "密码已重置", "labels": {"message": "消息"}}
+
+
+@router.delete("/{user_id}/permanent")
+async def permanently_delete_user(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """永久删除用户（管理员）"""
+    if current_user.get("角色") != "admin":
+        raise HTTPException(status_code=403, detail="仅管理员可永久删除")
+    if current_user.get("id") == user_id:
+        raise HTTPException(status_code=400, detail="不能删除自己")
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    await db.delete(user)
+    await db.flush()
+    return {"message": "用户已永久删除", "labels": {"message": "消息"}}

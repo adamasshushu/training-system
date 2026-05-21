@@ -66,6 +66,14 @@ class UserUpdate(BaseModel):
         populate_by_name = True
 
 
+class UserPasswordReset(BaseModel):
+    """管理员重置用户密码"""
+    新密码: str = Field(..., alias="new_password", min_length=6)
+
+    class Config:
+        populate_by_name = True
+
+
 class UserResponse(BaseModel):
     """用户响应"""
     ID: int = Field(..., alias="id")

@@ -48,12 +48,14 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="180" fixed="right">
+      <el-table-column label="操作" width="280" fixed="right">
         <template #default="{ row }">
           <el-button text size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
-          <el-button text size="small" type="danger" @click="handleDelete(row)">
+          <el-button text size="small" type="warning" @click="handleResetPwd(row)">重置密码</el-button>
+          <el-button text size="small" type="danger" @click="handleToggleStatus(row)">
             {{ row.是否激活 ? '停用' : '启用' }}
           </el-button>
+          <el-button text size="small" type="danger" @click="handlePermanentDelete(row)" :disabled="row.用户名 === 'admin'">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -116,6 +118,46 @@
         <el-button type="primary" @click="handleSubmit" :loading="submitting">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 重置密码对话框 -->
+    <el-dialog
+      v-model="pwdDialogVisible"
+      title="重置密码"
+      width="420px"
+      :close-on-click-modal="false"
+    >
+      <el-alert
+        :title="`正在为「${pwdTargetUser}」重置密码`"
+        type="info"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 16px"
+      />
+      <el-form ref="pwdFormRef" :model="pwdForm" :rules="pwdRules" label-width="80px" @submit.prevent>
+        <el-form-item label="新密码" prop="新密码">
+          <el-input
+            v-model="pwdForm.新密码"
+            type="password"
+            placeholder="请输入新密码（至少6位）"
+            show-password
+            @keyup.enter="handlePwdSubmit"
+          />
+        </el-form-item>
+        <el-form-item label="确认密码" prop="确认密码">
+          <el-input
+            v-model="pwdForm.确认密码"
+            type="password"
+            placeholder="再次输入新密码"
+            show-password
+            @keyup.enter="handlePwdSubmit"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="pwdDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handlePwdSubmit" :loading="pwdSubmitting">确认重置</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -123,7 +165,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { Search, Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getUsers, createUser, updateUser, deleteUser } from '@/api/users'
+import { getUsers, createUser, updateUser, deleteUser, resetUserPassword, permanentDeleteUser } from '@/api/users'
 import request from '@/api/index'
 
 const userList = ref([])
@@ -140,11 +182,41 @@ const submitting = ref(false)
 const formRef = ref(null)
 const editId = ref(null)
 
+// 密码重置
+const pwdDialogVisible = ref(false)
+const pwdSubmitting = ref(false)
+const pwdFormRef = ref(null)
+const pwdTargetId = ref(null)
+const pwdTargetUser = ref('')
+
+const pwdForm = reactive({
+  新密码: '',
+  确认密码: ''
+})
+
+const validateConfirmPwd = (rule, value, callback) => {
+  if (value !== pwdForm.新密码) {
+    callback(new Error('两次输入的密码不一致'))
+  } else {
+    callback()
+  }
+}
+
+const pwdRules = {
+  新密码: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 6, message: '密码至少6位', trigger: 'blur' }
+  ],
+  确认密码: [
+    { required: true, message: '请再次输入密码', trigger: 'blur' },
+    { validator: validateConfirmPwd, trigger: 'blur' }
+  ]
+}
+
 // 部门选项（树形 + 扁平）
 const deptTreeData = ref([])
 const departmentOptions = ref([])
 
-/** 拉平树形部门数据到扁平列表（用于筛选下拉） */
 function flattenDepts(nodes, result = []) {
   for (const n of nodes) {
     result.push({ id: n.ID, name: n.名称 })
@@ -155,7 +227,6 @@ function flattenDepts(nodes, result = []) {
   return result
 }
 
-/** 加载部门列表 */
 async function fetchDepartments() {
   try {
     const res = await request.get('/departments')
@@ -167,27 +238,17 @@ async function fetchDepartments() {
   }
 }
 
-/** 获取用户列表 */
 async function fetchUsers() {
   loading.value = true
   try {
-    const params = {
-      page: page.value,
-      page_size: pageSize.value
-    }
-    if (searchQuery.value.trim()) {
-      params.keyword = searchQuery.value.trim()
-    }
-    if (filterRole.value) {
-      params.role = filterRole.value
-    }
-    if (filterDept.value) {
-      params.department_id = filterDept.value
-    }
+    const params = { page: page.value, page_size: pageSize.value }
+    if (searchQuery.value.trim()) params.keyword = searchQuery.value.trim()
+    if (filterRole.value) params.role = filterRole.value
+    if (filterDept.value) params.department_id = filterDept.value
     const res = await getUsers(params)
     userList.value = res.数据 || []
     total.value = res.共计 || 0
-  } catch (e) {
+  } catch {
     userList.value = []
     total.value = 0
   } finally {
@@ -196,13 +257,8 @@ async function fetchUsers() {
 }
 
 const form = reactive({
-  用户名: '',
-  真实姓名: '',
-  邮箱: '',
-  手机号: '',
-  密码: '',
-  部门ID: null,
-  角色: 'student'
+  用户名: '', 真实姓名: '', 邮箱: '', 手机号: '',
+  密码: '', 部门ID: null, 角色: 'student'
 })
 
 const rules = {
@@ -211,9 +267,7 @@ const rules = {
     { min: 2, max: 50, message: '用户名长度2-50个字符', trigger: 'blur' }
   ],
   真实姓名: [{ required: true, message: '请输入真实姓名', trigger: 'blur' }],
-  邮箱: [
-    { pattern: /^$|^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: '邮箱格式不正确', trigger: 'blur' }
-  ],
+  邮箱: [{ pattern: /^$|^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: '邮箱格式不正确', trigger: 'blur' }],
   密码: [
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, message: '密码至少6位', trigger: 'blur' }
@@ -224,85 +278,106 @@ const rules = {
 function handleAdd() {
   isEdit.value = false
   editId.value = null
-  form.用户名 = ''
-  form.真实姓名 = ''
-  form.邮箱 = ''
-  form.手机号 = ''
-  form.密码 = ''
-  form.部门ID = null
-  form.角色 = 'student'
+  Object.assign(form, { 用户名: '', 真实姓名: '', 邮箱: '', 手机号: '', 密码: '', 部门ID: null, 角色: 'student' })
   dialogVisible.value = true
 }
 
 function handleEdit(row) {
   isEdit.value = true
   editId.value = row.ID
-  form.用户名 = row.用户名
-  form.真实姓名 = row.真实姓名
-  form.邮箱 = row.邮箱 || ''
-  form.手机号 = row.手机号 || ''
-  form.密码 = ''
-  form.部门ID = row.部门ID
-  form.角色 = row.角色
+  Object.assign(form, {
+    用户名: row.用户名, 真实姓名: row.真实姓名,
+    邮箱: row.邮箱 || '', 手机号: row.手机号 || '',
+    密码: '', 部门ID: row.部门ID, 角色: row.角色
+  })
   dialogVisible.value = true
 }
 
-function handleDelete(row) {
+// 重置密码
+function handleResetPwd(row) {
+  pwdTargetId.value = row.ID
+  pwdTargetUser.value = `${row.真实姓名}（${row.用户名}）`
+  pwdForm.新密码 = ''
+  pwdForm.确认密码 = ''
+  pwdDialogVisible.value = true
+}
+
+async function handlePwdSubmit() {
+  const valid = await pwdFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+  pwdSubmitting.value = true
+  try {
+    await resetUserPassword(pwdTargetId.value, pwdForm.新密码)
+    ElMessage.success('密码重置成功')
+    pwdDialogVisible.value = false
+  } catch {
+    // 拦截器已处理
+  } finally {
+    pwdSubmitting.value = false
+  }
+}
+
+// 停用/启用
+function handleToggleStatus(row) {
   const action = row.是否激活 ? '停用' : '启用'
   const msg = row.是否激活
-    ? `确定要停用员工"${row.真实姓名}"吗？停用后该账号无法登录`
-    : `确定要重新启用员工"${row.真实姓名}"吗？`
-
+    ? `确定要停用员工「${row.真实姓名}」吗？停用后将无法登录`
+    : `确定要重新启用员工「${row.真实姓名}」吗？`
   ElMessageBox.confirm(msg, '提示', { type: 'warning' })
     .then(async () => {
-      try {
-        if (row.是否激活) {
-          await deleteUser(row.ID)
-          ElMessage.success('已停用')
-        } else {
-          await updateUser(row.ID, { 是否激活: true })
-          ElMessage.success('已启用')
-        }
-        fetchUsers()
-      } catch (e) {
-        // 错误已在拦截器中处理
+      if (row.是否激活) {
+        await deleteUser(row.ID)
+        ElMessage.success('已停用')
+      } else {
+        await updateUser(row.ID, { 是否激活: true })
+        ElMessage.success('已启用')
       }
+      fetchUsers()
+    })
+    .catch(() => {})
+}
+
+// 永久删除
+function handlePermanentDelete(row) {
+  ElMessageBox.confirm(
+    `永久删除员工「${row.真实姓名}（${row.用户名}）」？\n此操作不可恢复，该用户所有数据将被清除！`,
+    '危险操作',
+    { type: 'error', confirmButtonText: '确认删除', cancelButtonText: '取消' }
+  )
+    .then(async () => {
+      await permanentDeleteUser(row.ID)
+      ElMessage.success('已永久删除')
+      fetchUsers()
     })
     .catch(() => {})
 }
 
 async function handleSubmit() {
-  const valid = await formRef.value.validate().catch(() => false)
+  const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
   submitting.value = true
   try {
     if (isEdit.value) {
-      const data = {
+      await updateUser(editId.value, {
         真实姓名: form.真实姓名,
         邮箱: form.邮箱 || null,
         手机号: form.手机号 || null,
         角色: form.角色,
         部门ID: form.部门ID || null,
-      }
-      await updateUser(editId.value, data)
+      })
       ElMessage.success('编辑成功')
     } else {
-      const data = {
-        用户名: form.用户名,
-        真实姓名: form.真实姓名,
-        密码: form.密码,
-        邮箱: form.邮箱 || null,
-        手机号: form.手机号 || null,
-        角色: form.角色,
-        部门ID: form.部门ID || null,
-      }
-      await createUser(data)
+      await createUser({
+        用户名: form.用户名, 真实姓名: form.真实姓名, 密码: form.密码,
+        邮箱: form.邮箱 || null, 手机号: form.手机号 || null,
+        角色: form.角色, 部门ID: form.部门ID || null,
+      })
       ElMessage.success('新增成功')
     }
     dialogVisible.value = false
     fetchUsers()
-  } catch (e) {
-    // 错误已在拦截器中处理
+  } catch {
+    // 拦截器已处理
   } finally {
     submitting.value = false
   }
