@@ -1,23 +1,27 @@
-# 环境
+# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
 dist/
-.env
 venv/
+.venv/
+
+# Node
 node_modules/
-.DS_Store
 
-# 数据库
+# Database
 *.db
-*.sqlite3
+*.db-wal
+*.db-shm
+*.db.backup.*
 
-# 证书
-*.pem
+# SSL (keep certs, but ignore private keys in production)
+# key.pem — 不要提交到公开仓库！
 
-# 上传文件
-uploads/
-_storage/
+# Environment
+.env
+.env.local
+.env.production
 
 # IDE
 .vscode/
@@ -25,5 +29,13 @@ _storage/
 *.swp
 *.swo
 
-# 日志
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads
+uploads/*
+!uploads/.gitkeep
+
+# Logs
 *.log
