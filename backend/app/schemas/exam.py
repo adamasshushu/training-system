@@ -13,7 +13,7 @@ class QuestionCreate(BaseModel):
     题目内容: str = Field(..., alias="title")
     选项: Optional[str] = Field(None, alias="options")
     正确答案: Optional[str] = Field(None, alias="answer")
-    分值: float = Field(10, alias="score")
+    分值: float = Field(10, alias="score", ge=0)
     难度: int = Field(1, alias="difficulty", ge=1, le=5)
 
     class Config:
@@ -26,7 +26,7 @@ class QuestionUpdate(BaseModel):
     题目内容: Optional[str] = Field(None, alias="title")
     选项: Optional[str] = Field(None, alias="options")
     正确答案: Optional[str] = Field(None, alias="answer")
-    分值: Optional[float] = Field(None, alias="score")
+    分值: Optional[float] = Field(None, ge=0, alias="score")
     难度: Optional[int] = Field(None, alias="difficulty")
 
     class Config:
@@ -64,7 +64,7 @@ class QuestionResponse(BaseModel):
 
 class ExamQuestionCreate(BaseModel):
     题目ID: int
-    分值: float = 10
+    分值: float = Field(10, alias="score", ge=0)
     排序: int = 0
 
 

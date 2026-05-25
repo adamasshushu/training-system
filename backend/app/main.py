@@ -159,14 +159,29 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS - 允许所有来源
+# CORS - 仅允许前端开发服务器
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=['http://localhost:5173', 'https://localhost:5173'],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ========== 安全头 & Server 头隐藏 ==========
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    # 移除 Server 头
+    if "server" in response.headers:
+        del response.headers["server"]
+    return response
 
 # 去除末尾斜杠中间件
 app.add_middleware(StripTrailingSlashMiddleware)

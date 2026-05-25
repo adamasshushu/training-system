@@ -11,6 +11,7 @@ from app.database import get_db
 from app.models.file import FileRecord
 from app.utils.auth import get_current_user
 from app.utils.storage import get_storage, generate_file_path, get_file_type
+from app.config import settings
 
 router = APIRouter(prefix="/api/uploads", tags=["文件上传"])
 
@@ -25,6 +26,15 @@ async def upload_file(
     """上传文件（图片/视频/文档/PDF等）"""
     if not file.filename:
         raise HTTPException(status_code=400, detail="文件名不能为空")
+
+    # 安全：拒绝危险文件扩展名（可执行脚本、webshell等）
+    DANGEROUS_EXTENSIONS = {"php", "phtml", "pht", "php3", "php4", "php5", "php7", "phar",
+                             "asp", "aspx", "ashx", "asmx", "jsp", "jspx", "cgi", "pl",
+                             "py", "rb", "sh", "bash", "exe", "bat", "cmd", "ps1",
+                             "war", "jar", "class", "dll", "so", "htaccess"}
+    file_ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    if file_ext in DANGEROUS_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"不允许上传 .{file_ext} 类型文件")
 
     # 读取文件内容
     content = await file.read()
@@ -116,9 +126,20 @@ async def list_files(
 
 
 @router.get("/{file_path:path}")
-async def serve_file(file_path: str):
+async def serve_file(
+    file_path: str,
+    current_user: dict = Depends(get_current_user),
+):
     """提供文件访问（图片、视频直接预览，文档下载）"""
+    # 路径遍历防护：确保文件在uploads目录内
     storage = get_storage()
+    upload_dir = os.path.realpath(settings.UPLOAD_DIR)
+    # 先标准化路径（解析 .. 和 .）再检查
+    normalized = os.path.normpath(os.path.join(upload_dir, file_path))
+    requested_path = os.path.realpath(normalized)
+    if not requested_path.startswith(upload_dir + os.sep) and requested_path != upload_dir:
+        raise HTTPException(status_code=403, detail="禁止访问该路径")
+
     content = await storage.read(file_path)
     if content is None:
         raise HTTPException(status_code=404, detail="文件不存在")

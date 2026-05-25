@@ -1,5 +1,6 @@
 """课程管理路由"""
 from typing import Optional
+import html  # 用于 XSS 防护
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
@@ -134,7 +135,7 @@ async def list_courses(
         lesson_count = sum(len(ch.lessons) for ch in c.chapters)
         course_list.append({
             "ID": c.id,
-            "标题": c.title,
+            "标题": html.escape(c.title, quote=False),
             "简介": c.description,
             "封面": c.cover,
             "分类ID": c.category_id,
@@ -191,7 +192,7 @@ async def list_student_courses(
                 teacher_name = t.real_name
         course_list.append({
             "ID": c.id,
-            "标题": c.title,
+            "标题": html.escape(c.title, quote=False),
             "简介": c.description,
             "封面": c.cover,
             "分类名称": cat_name,
@@ -292,6 +293,12 @@ async def create_course(
     """创建课程"""
     if current_user.get("角色") not in ("admin", "teacher"):
         raise HTTPException(status_code=403, detail="无权限创建课程")
+    # 验证分类ID是否存在
+    if req.分类ID:
+        from app.models.course import CourseCategory
+        cat_result = await db.execute(select(CourseCategory).where(CourseCategory.id == req.分类ID))
+        if not cat_result.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail=f"分类ID {req.分类ID} 不存在")
     course = Course(
         title=req.标题,
         description=req.简介,
@@ -306,7 +313,7 @@ async def create_course(
     return {
         "message": "课程创建成功",
         "ID": course.id,
-        "标题": course.title,
+        "标题": html.escape(course.title, quote=False),
         "labels": {"message": "消息", "ID": "id", "标题": "title"}
     }
 
