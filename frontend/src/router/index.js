@@ -123,6 +123,12 @@ const routes = [
         meta: { title: '企业平台' }
       },
       {
+        path: 'ad-users',
+        name: 'AdminAdUsers',
+        component: () => import('@/views/admin/AdUserCenter.vue'),
+        meta: { title: 'AD用户中心' }
+      },
+      {
         path: 'feedback-manage',
         name: 'AdminFeedbackManage',
         component: () => import('@/views/admin/FeedbackManage.vue'),

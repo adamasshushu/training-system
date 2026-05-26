@@ -24,6 +24,9 @@
       <el-menu-item index="/admin/users">
         <template #title>员工管理</template>
       </el-menu-item>
+      <el-menu-item index="/admin/ad-users">
+        <template #title>AD用户中心</template>
+      </el-menu-item>
     </el-sub-menu>
 
     <el-sub-menu index="education">

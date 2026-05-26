@@ -1,5 +1,5 @@
 """认证路由：登录、注册、获取当前用户"""
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
@@ -8,12 +8,14 @@ from app.utils.auth import (
     create_access_token, get_password_hash, verify_password, get_current_user
 )
 from app.schemas.user import LoginRequest, UserCreate, UserResponse, LoginResponse
+from app.utils.rate_limit import limiter
 
 router = APIRouter(prefix="/api/auth", tags=["认证"])
 
 
 @router.post("/login", response_model=LoginResponse)
-async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")
+async def login(req: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """用户登录，支持LDAP SSO或本地密码"""
     result = await db.execute(
         select(User).where(User.username == req.用户名)
@@ -21,9 +23,9 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(req.密码, user.password_hash):
-        # 尝试LDAP认证（如果配置了）
+        # 尝试LDAP认证（从企业平台配置读取LDAP设置）
         from app.utils.ldap_auth import ldap_authenticate
-        ldap_info = await ldap_authenticate(req.用户名, req.密码)
+        ldap_info = await ldap_authenticate(req.用户名, req.密码, db)
         if ldap_info and not user:
             # LDAP认证成功，但用户不存在 → 自动创建
             user = User(

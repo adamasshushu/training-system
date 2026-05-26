@@ -2,7 +2,7 @@
   <div class="enterprise-settings">
     <el-card class="page-card">
       <h2 style="margin: 0 0 20px; font-size: 18px">🏢 企业平台对接</h2>
-      <p class="page-desc">配置钉钉、飞书、企业微信，自动同步组织架构并发送培训通知</p>
+      <p class="page-desc">配置钉钉、飞书、企业微信、LDAP/AD，自动同步组织架构并发送培训通知</p>
 
       <el-tabs v-model="activeTab" @tab-change="loadConfig">
         <el-tab-pane v-for="p in platforms" :key="p.key" :name="p.key">
@@ -37,6 +37,14 @@
               </el-button>
               <el-button
                 size="large"
+                @click="testConnection(p.key)"
+                :loading="testing"
+                style="margin-left: 12px"
+              >
+                测试连接
+              </el-button>
+              <el-button
+                size="large"
                 @click="syncPlatform(p.key)"
                 :loading="syncing"
                 :disabled="!configData.is_enabled"
@@ -55,13 +63,40 @@
       <el-alert v-if="syncError" type="error" :description="syncError" show-icon />
       <div v-else class="sync-result">
         <el-descriptions :column="2" border>
-          <el-descriptions-item label="新增部门">{{ syncStats?.departments_added || 0 }}</el-descriptions-item>
+          <el-descriptions-item label="同步部门">{{ syncStats?.ous_synced || 0 }}</el-descriptions-item>
           <el-descriptions-item label="新增用户">{{ syncStats?.users_added || 0 }}</el-descriptions-item>
           <el-descriptions-item label="更新用户">{{ syncStats?.users_updated || 0 }}</el-descriptions-item>
+          <el-descriptions-item label="跳过用户">{{ syncStats?.users_skipped || 0 }}</el-descriptions-item>
         </el-descriptions>
         <el-tag type="success" size="large" style="margin-top: 16px">同步完成 ✅</el-tag>
       </div>
     </el-dialog>
+
+    <!-- 同步历史 -->
+    <el-card shadow="never" style="margin-top: 20px" v-if="syncLogs.length > 0">
+      <template #header>
+        <span style="font-weight: 600">📋 同步历史</span>
+        <el-button text size="small" @click="loadSyncLogs" style="float: right">刷新</el-button>
+      </template>
+      <el-table :data="syncLogs" size="small" stripe>
+        <el-table-column prop="时间" label="时间" width="170">
+          <template #default="{ row }">{{ row.时间?.slice(0, 19) }}</template>
+        </el-table-column>
+        <el-table-column prop="平台" label="平台" width="100" />
+        <el-table-column label="状态" width="80">
+          <template #default="{ row }">
+            <el-tag :type="row.状态 === 'success' ? 'success' : 'danger'" size="small">
+              {{ row.状态 === 'success' ? '成功' : '失败' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="部门数" label="部门" width="60" />
+        <el-table-column prop="新增用户" label="新增" width="60" />
+        <el-table-column prop="更新用户" label="更新" width="60" />
+        <el-table-column prop="跳过用户" label="跳过" width="60" />
+        <el-table-column prop="操作人" label="操作人" width="100" />
+      </el-table>
+    </el-card>
   </div>
 </template>
 
@@ -85,6 +120,7 @@ const configData = reactive({ is_enabled: false, config: {} })
 const syncResultVisible = ref(false)
 const syncStats = ref(null)
 const syncError = ref('')
+const syncLogs = ref([])
 
 const platforms = [
   {
@@ -109,6 +145,17 @@ const platforms = [
       { key: 'corp_id', label: 'CorpID', placeholder: '企业微信CorpID', required: true, secret: false },
       { key: 'corp_secret', label: 'CorpSecret', placeholder: '企业微信应用的Secret', required: true, secret: true },
       { key: 'agent_id', label: 'AgentId', placeholder: '应用的AgentId', required: true, secret: false },
+    ]
+  },
+  {
+    key: 'ldap', label: 'LDAP/AD',
+    fields: [
+      { key: 'server', label: '服务器地址', placeholder: '192.168.22.222', required: true, secret: false },
+      { key: 'port', label: '端口', placeholder: '389', required: false, secret: false },
+      { key: 'domain', label: '域名', placeholder: 'cyb-org.cn (自动推导Base DN)', required: false, secret: false },
+      { key: 'username', label: '用户名', placeholder: 'Administrator', required: true, secret: false },
+      { key: 'password', label: '密码', placeholder: '域管理员密码', required: true, secret: true },
+      { key: 'base_dn', label: '搜索Base DN', placeholder: 'DC=cyb-org,DC=cn (留空自动推导)', required: false, secret: false },
     ]
   }
 ]
@@ -160,12 +207,20 @@ const syncPlatform = async (platform) => {
     syncStats.value = res.data.数据 || {}
     syncResultVisible.value = true
     ElMessage.success('组织架构同步完成')
+    loadSyncLogs()  // 刷新日志
   } catch (e) {
     syncError.value = e.response?.data?.detail || '同步失败'
     syncResultVisible.value = true
   } finally {
     syncing.value = false
   }
+}
+
+const loadSyncLogs = async () => {
+  try {
+    const res = await API.get('/api/enterprise/sync-logs?limit=10')
+    syncLogs.value = res.data.数据 || []
+  } catch { /* silent */ }
 }
 
 const loadAllConfigs = async () => {
@@ -180,6 +235,7 @@ const loadAllConfigs = async () => {
 onMounted(() => {
   loadAllConfigs()
   loadConfig('dingtalk')
+  loadSyncLogs()
 })
 </script>
 

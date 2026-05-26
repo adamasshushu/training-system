@@ -1,7 +1,7 @@
 <template>
   <div class="exams-page">
     <AdminTable
-      :data="examList"
+      :data="filteredExamList"
       :loading="loading"
       :total="total"
       v-model:model-value="page"
@@ -16,9 +16,18 @@
       <template #page-header>
         <div class="page-header">
           <h2 class="page-title">考试管理</h2>
-          <el-button type="primary" @click="handleAdd">
-            <el-icon><Plus /></el-icon>新建考试
-          </el-button>
+          <div class="header-right">
+            <el-input
+              v-model="searchQuery"
+              placeholder="搜索考试名称..."
+              clearable
+              style="width: 240px; margin-right: 12px"
+              :prefix-icon="Search"
+            />
+            <el-button type="primary" @click="handleAdd">
+              <el-icon><Plus /></el-icon>新建考试
+            </el-button>
+          </div>
         </div>
       </template>
 
@@ -104,8 +113,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { Plus } from '@element-plus/icons-vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { Plus, Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getExams, getExamDetail, createExam, updateExam, deleteExam, getQuestions } from '@/api/exams'
 import AdminTable from '@/components/AdminTable.vue'
@@ -126,6 +135,13 @@ const qTotal = ref(0)
 const qPage = ref(1)
 const questionFilter = reactive({ type: '', keyword: '' })
 const selectedQuestions = ref([])
+
+const searchQuery = ref('')
+const filteredExamList = computed(() => {
+  if (!searchQuery.value) return examList.value
+  const kw = searchQuery.value.toLowerCase()
+  return examList.value.filter(item => (item.标题 || '').toLowerCase().includes(kw))
+})
 
 const columns = [
   { prop: '标题', label: '考试名称', minWidth: 200 },
@@ -248,5 +264,6 @@ onMounted(() => loadData())
 <style scoped>
 .exams-page { max-width: 1200px; }
 .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.header-right { display: flex; align-items: center; }
 .page-title { font-size: 22px; font-weight: 600;  color: var(--text-primary);}
 </style>

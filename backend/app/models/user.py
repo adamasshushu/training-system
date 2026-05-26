@@ -17,6 +17,7 @@ class User(Base):
     role = Column(String(20), default="student", comment="角色: admin管理/teacher讲师/student学员")
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
     avatar = Column(String(255), nullable=True)
+    source = Column(String(20), default="local", comment="来源: local本地/ldap域控")
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

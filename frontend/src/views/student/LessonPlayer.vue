@@ -271,6 +271,7 @@ import { ref, computed, onMounted, watch, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import {
   ArrowLeft,
   VideoCameraFilled,
@@ -361,7 +362,7 @@ const lessonTypeTag = (type) => {
 const renderedMarkdown = computed(() => {
   if (!lessonContent.value) return '<p style="color:#94a3b8">暂无内容</p>'
   try {
-    return marked.parse(lessonContent.value)
+    return DOMPurify.sanitize(marked.parse(lessonContent.value))
   } catch {
     return lessonContent.value
   }

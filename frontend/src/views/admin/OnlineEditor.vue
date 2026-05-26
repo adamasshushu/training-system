@@ -54,6 +54,7 @@ import { Upload } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { getToken } from '@/utils/auth'
 import axios from 'axios'
+import DOMPurify from 'dompurify'
 
 const API = axios.create({ baseURL: '' })
 API.interceptors.request.use((config) => {
@@ -94,7 +95,7 @@ const renderedMarkdown = computed(() => {
       if (p.trim().startsWith('<li>')) return `<ul>${p}</ul>`
       return `<p>${p.replace(/\n/g, '<br/>')}</p>`
     }).join('\n')
-  return html
+  return DOMPurify.sanitize(html)
 })
 
 const saveContent = async () => {

@@ -1,7 +1,7 @@
 <template>
   <div class="course-categories">
     <AdminTable
-      :data="categoryList"
+      :data="filteredCategoryList"
       :loading="loading"
       :total="total"
       v-model:model-value="page"
@@ -13,7 +13,16 @@
       <template #page-header>
         <div class="page-header">
           <h2 class="page-title">课程分类</h2>
-          <el-button type="primary" @click="handleAdd"><el-icon><Plus /></el-icon>新增分类</el-button>
+          <div class="header-right">
+            <el-input
+              v-model="searchQuery"
+              placeholder="搜索分类名称..."
+              clearable
+              style="width: 240px; margin-right: 12px"
+              :prefix-icon="Search"
+            />
+            <el-button type="primary" @click="handleAdd"><el-icon><Plus /></el-icon>新增分类</el-button>
+          </div>
         </div>
       </template>
 
@@ -63,8 +72,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { Plus } from '@element-plus/icons-vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { Plus, Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getCategories, createCategory, deleteCategory } from '@/api/courses'
 import AdminTable from '@/components/AdminTable.vue'
@@ -79,6 +88,13 @@ const isEdit = ref(false)
 const submitting = ref(false)
 const formRef = ref(null)
 const editId = ref(null)
+
+const searchQuery = ref('')
+const filteredCategoryList = computed(() => {
+  if (!searchQuery.value) return categoryList.value
+  const kw = searchQuery.value.toLowerCase()
+  return categoryList.value.filter(item => (item['名称'] || '').toLowerCase().includes(kw))
+})
 
 const form = reactive({ '名称': '', '排序': 0 })
 const rules = { '名称': [{ required: true, message: '请输入分类名称', trigger: 'blur' }] }
@@ -157,5 +173,6 @@ onMounted(() => {
 <style scoped>
 .course-categories { max-width: 1200px; }
 .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.header-right { display: flex; align-items: center; }
 .page-title { font-size: 22px; font-weight: 600; color: var(--text-primary); }
 </style>

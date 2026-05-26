@@ -141,7 +141,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, watch, onMounted } from 'vue'
 import { Search, Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -238,7 +238,7 @@ const handleEdit = (row) => {
   isEdit.value = true
   editId.value = row['ID']
   form['标题'] = row['标题']
-  form['分类ID'] = ''
+  form['分类ID'] = row['分类ID'] || ''
   form['简介'] = row['简介'] || ''
   form['封面'] = row['封面'] || ''
   dialogVisible.value = true
@@ -285,7 +285,7 @@ const handleSubmit = async () => {
   try {
     const payload = {
       '标题': form['标题'],
-      '分类ID': form['分类ID'],
+      '分类ID': form['分类ID'] || null,
       '简介': form['简介'] || '',
       '封面': form['封面'] || ''
     }
@@ -303,6 +303,22 @@ const handleSubmit = async () => {
     submitting.value = false
   }
 }
+
+// 搜索输入变化时重新查询（防抖 300ms）
+let searchTimer = null
+watch(searchQuery, () => {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    page.value = 1
+    fetchCourses()
+  }, 300)
+})
+
+// 分类筛选变化时重新查询
+watch(categoryFilter, () => {
+  page.value = 1
+  fetchCourses()
+})
 
 onMounted(() => {
   fetchCategories()

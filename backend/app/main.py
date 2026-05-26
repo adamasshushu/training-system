@@ -7,6 +7,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import select
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -164,8 +166,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=['http://localhost:5173', 'https://localhost:5173'],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # ========== 安全头 & Server 头隐藏 ==========
@@ -178,10 +180,17 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'"
     # 移除 Server 头
     if "server" in response.headers:
         del response.headers["server"]
     return response
+
+# 速率限制中间件
+from app.utils.rate_limit import limiter
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # 去除末尾斜杠中间件
 app.add_middleware(StripTrailingSlashMiddleware)
@@ -189,7 +198,7 @@ app.add_middleware(StripTrailingSlashMiddleware)
 
 # ========== 注册路由 ==========
 
-from app.routers import auth, departments, users, courses, exams, tasks, certificates, uploads, system, fetch_url, learning_paths, progress, dashboard, enterprise, reviews, notifications, bookmarks, knowledge_graph, reports, videos
+from app.routers import auth, departments, users, courses, exams, tasks, certificates, uploads, system, fetch_url, learning_paths, progress, dashboard, enterprise, ldap, reviews, notifications, bookmarks, knowledge_graph, reports, videos
 
 app.include_router(auth.router)
 app.include_router(departments.router)
@@ -205,6 +214,7 @@ app.include_router(learning_paths.router)
 app.include_router(progress.router)
 app.include_router(dashboard.router)
 app.include_router(enterprise.router)
+app.include_router(ldap.router)
 app.include_router(reviews.router)
 app.include_router(notifications.router)
 app.include_router(bookmarks.router)

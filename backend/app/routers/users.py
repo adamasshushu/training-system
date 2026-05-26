@@ -65,6 +65,7 @@ async def list_users(
             "角色": u.role,
             "部门ID": u.department_id,
             "部门名称": dept_name,
+            "来源": getattr(u, 'source', 'local') or 'local',
             "是否激活": u.is_active,
             "创建时间": str(u.created_at) if u.created_at else None,
         })

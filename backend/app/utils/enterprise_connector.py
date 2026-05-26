@@ -1,507 +1,288 @@
 """
-企业平台连接器：钉钉、飞书、企业微信统一接口
+企业平台连接器：钉钉/飞书/企微/LDAP
 
-架构：
-- 每个平台实现一个 Connector 类
-- 通过 get_connector(platform) 工厂方法获取实例
-- 提供 sync_organization() 同步组织架构
-- 提供 send_message() 发送消息通知
+支持的平台：
+- dingtalk: 钉钉
+- feishu: 飞书
+- wecom: 企业微信
+- ldap: LDAP/AD 域控
+
+每个连接器实现：
+- test_connection() → (bool, str)
+- sync_organization(db) → dict
+- send_message(user_ids, content) → dict (LDAP 不支持)
 """
 
 import json
 import logging
-from abc import ABC, abstractmethod
-from typing import Optional, Any
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
-class PlatformConnector(ABC):
-    """平台连接器基类"""
+# ═══════════════ LDAP / AD 连接器 ═══════════════
 
-    def __init__(self, config: dict):
-        self.config = config
-        self._client = None
+class LdapConnector:
+    """LDAP/Active Directory 组织同步连接器"""
 
-    @abstractmethod
-    async def sync_organization(self, db: AsyncSession) -> dict:
-        """同步组织架构，返回 {departments: [...], users: [...], stats: {...}}"""
-        pass
+    def __init__(self, config_json: str | dict):
+        if isinstance(config_json, str):
+            self.config = json.loads(config_json)
+        else:
+            self.config = config_json
 
-    @abstractmethod
-    async def send_message(self, user_ids: list[str], content: str) -> dict:
-        """发送消息通知"""
-        pass
+        self.server = self.config.get('server', '')
+        self.port = int(self.config.get('port', 389))
+        self.use_ssl = self.config.get('use_ssl', False)
+        self.username = self.config.get('username', 'Administrator')
+        self.password = self.config.get('password', '')
+        self.base_dn = self.config.get('base_dn', '')
+        self.user_filter = self.config.get('user_filter', '(objectClass=user)')
+        self.ou_filter = self.config.get('ou_filter', '(objectClass=organizationalUnit)')
 
-    @abstractmethod
-    async def get_access_token(self) -> str:
-        """获取访问令牌"""
-        pass
+        # Auto-construct bind_dn from domain + username
+        domain = self.config.get('domain', '')
+        if domain:
+            domain_dn = ','.join(f'DC={p}' for p in domain.split('.'))
+            self.bind_dn = self.config.get('bind_dn') or f'CN={self.username},CN=Users,{domain_dn}'
+            if not self.base_dn:
+                self.base_dn = domain_dn
+        else:
+            self.bind_dn = self.config.get('bind_dn', f'CN={self.username},CN=Users,DC=cyb-org,DC=cn')
 
+        # Fallback: if no domain and no base_dn, derive from bind_dn
+        if not self.base_dn and self.bind_dn:
+            import re
+            dcs = re.findall(r'DC=([^,]+)', self.bind_dn, re.IGNORECASE)
+            if dcs:
+                self.base_dn = ','.join(f'DC={dc}' for dc in dcs)
+        if not self.base_dn:
+            self.base_dn = 'DC=cyb-org,DC=cn'
 
-# ========================================================================
-# 钉钉连接器
-# ========================================================================
+    def _connect(self):
+        """建立 LDAP 连接"""
+        import ldap3
+        server = ldap3.Server(self.server, port=self.port, use_ssl=self.use_ssl,
+                              get_info=ldap3.ALL)
+        conn = ldap3.Connection(server, user=self.bind_dn,
+                               password=self.password, auto_bind=True)
+        return conn
 
-class DingTalkConnector(PlatformConnector):
-    """钉钉连接器"""
+    async def test_connection(self) -> tuple[bool, str]:
+        """测试 LDAP 连接"""
+        try:
+            conn = self._connect()
+            conn.unbind()
+            return (True, f"连接成功 - {self.server}")
+        except Exception as e:
+            return (False, f"连接失败: {str(e)}")
 
-    async def get_access_token(self) -> str:
-        import httpx
-        app_key = self.config.get("app_key")
-        app_secret = self.config.get("app_secret")
-        if not app_key or not app_secret:
-            raise ValueError("钉钉配置缺失: app_key/app_secret")
-
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                "https://oapi.dingtalk.com/gettoken",
-                params={"appkey": app_key, "appsecret": app_secret}
-            )
-            data = resp.json()
-            if data.get("errcode") != 0:
-                raise Exception(f"钉钉token获取失败: {data}")
-            return data["access_token"]
-
-    async def sync_organization(self, db: AsyncSession) -> dict:
-        from app.models.department import Department
+    async def sync_organization(self, db) -> dict:
+        """从 LDAP 同步组织架构到培训系统"""
+        import ldap3
         from app.models.user import User
-        from app.utils.auth import get_password_hash
+        from app.models.department import Department
         from sqlalchemy import select
 
-        token = await self.get_access_token()
-        stats = {"departments_added": 0, "users_added": 0, "users_updated": 0}
+        stats = {
+            'ous_synced': 0,
+            'users_added': 0,
+            'users_updated': 0,
+            'users_skipped': 0,
+            'errors': [],
+        }
 
-        async with httpx.AsyncClient() as client:
-            # 1. 获取部门列表
-            dept_resp = await client.post(
-                "https://oapi.dingtalk.com/topapi/v2/department/listsub",
-                params={"access_token": token},
-                json={"dept_id": 1}
+        try:
+            conn = self._connect()
+        except Exception as e:
+            return {'error': f'LDAP 连接失败: {e}'}
+
+        try:
+            # ── Step 1: Sync OUs as departments (preserve hierarchy) ──
+            conn.search(self.base_dn, self.ou_filter,
+                       attributes=['ou', 'distinguishedName'],
+                       search_scope=ldap3.SUBTREE)
+
+            # Sort by DN depth (shallow first) so parents exist before children
+            entries_sorted = sorted(
+                conn.entries,
+                key=lambda e: str(e.distinguishedName).count(',')
             )
-            dept_data = dept_resp.json()
 
-            if dept_data.get("errcode") == 0:
-                dept_list = dept_data.get("result", [])
-            else:
-                # fallback: 获取单个部门树
-                dept_list = []
-                tree_resp = await client.post(
-                    "https://oapi.dingtalk.com/topapi/v2/department/list",
-                    params={"access_token": token},
-                    json={"dept_id": 1}
-                )
-                tree_data = tree_resp.json()
-                dept_list = self._flatten_dept_tree(tree_data.get("result", []))
-                if not dept_list:
-                    dept_list = [{"dept_id": 1, "name": self.config.get("corp_name", "企业"), "parent_id": 0}]
+            ou_map = {}  # dn_lower → department_id
+            for entry in entries_sorted:
+                ou_name = str(entry.ou) if entry.ou else str(entry.distinguishedName).split(',')[0][3:]
+                dn = str(entry.distinguishedName)
 
-            # 同步部门
-            dept_id_map = {0: None}
-            for dd in dept_list:
-                external_id = str(dd.get("dept_id"))
-                parent_external_id = str(dd.get("parent_id", 0))
+                # Find parent OU from DN
+                parent_id = None
+                dn_parts = dn.split(',')
+                if len(dn_parts) > 1:
+                    parent_dn = ','.join(dn_parts[1:]).lower()
+                    # Look up parent in ou_map (only non-domain parts)
+                    parent_key = parent_dn
+                    parent_id = ou_map.get(parent_key)
 
+                # Check if department exists by name+parent
                 result = await db.execute(
-                    select(Department).where(Department.name == dd.get("name"))
+                    select(Department).where(
+                        Department.name == ou_name,
+                        Department.parent_id == parent_id
+                    )
                 )
                 dept = result.scalar_one_or_none()
+
                 if not dept:
                     dept = Department(
-                        name=dd.get("name", "未知部门"),
-                        parent_id=dept_id_map.get(parent_external_id),
-                        sort=dd.get("order", 0),
-                        is_active=True,
+                        name=ou_name,
+                        parent_id=parent_id,
+                        sort=0,
+                        is_active=True
                     )
                     db.add(dept)
                     await db.flush()
-                    stats["departments_added"] += 1
 
-                dept_id_map[external_id] = dept.id
+                ou_map[dn.lower()] = dept.id
+                stats['ous_synced'] += 1
 
-            # 2. 获取员工列表
-            cursor = 0
-            has_more = True
-            while has_more:
-                user_resp = await client.post(
-                    "https://oapi.dingtalk.com/topapi/v2/user/list",
-                    params={"access_token": token},
-                    json={"dept_id": 1, "cursor": cursor, "size": 100}
-                )
-                user_data = user_resp.json()
-                if user_data.get("errcode") == 0:
-                    user_list = user_data.get("result", {}).get("list", [])
-                    for u in user_list:
-                        username = u.get("userid") or u.get("mobile", "")
-                        if not username:
-                            continue
-                        result = await db.execute(
-                            select(User).where(User.username == username[:50])
-                        )
-                        user = result.scalar_one_or_none()
-                        if user:
-                            user.real_name = u.get("name", user.real_name)
-                            user.email = u.get("email") or user.email
-                            user.phone = u.get("mobile") or user.phone
-                            dept_ids = u.get("dept_id_list", [])
-                            if dept_ids:
-                                ext_id = str(dept_ids[0])
-                                if ext_id in dept_id_map:
-                                    user.department_id = dept_id_map[ext_id]
-                            stats["users_updated"] += 1
-                        else:
-                            dept_ids = u.get("dept_id_list", [])
-                            dept_id = dept_id_map.get(str(dept_ids[0])) if dept_ids else None
-                            user = User(
-                                username=username[:50],
-                                real_name=u.get("name", ""),
-                                email=u.get("email"),
-                                phone=u.get("mobile"),
-                                password_hash=get_password_hash("123456"),
-                                role="student",
-                                department_id=dept_id,
-                                is_active=True,
-                            )
-                            db.add(user)
-                            stats["users_added"] += 1
+            # ── Step 2: Sync users ──
+            attrs = ['sAMAccountName', 'displayName', 'mail', 'mobile',
+                    'department', 'employeeID', 'distinguishedName',
+                    'userAccountControl']
+            conn.search(self.base_dn, self.user_filter,
+                       attributes=attrs, search_scope=ldap3.SUBTREE)
 
-                    has_more = user_data.get("result", {}).get("has_more", False)
-                    cursor = user_data.get("result", {}).get("next_cursor", 0)
-                else:
-                    has_more = False
-
-        return {"platform": "dingtalk", **stats}
-
-    def _flatten_dept_tree(self, tree, parent_id=0):
-        result = []
-        for item in tree:
-            result.append({
-                "dept_id": item.get("dept_id"),
-                "name": item.get("name"),
-                "parent_id": parent_id,
-                "order": item.get("order", 0),
-            })
-            children = item.get("children", [])
-            if children:
-                result.extend(self._flatten_dept_tree(children, item.get("dept_id")))
-        return result
-
-    async def send_message(self, user_ids: list[str], content: str) -> dict:
-        token = await self.get_access_token()
-        agent_id = self.config.get("agent_id")
-        if not agent_id:
-            raise ValueError("钉钉配置缺失: agent_id")
-
-        import httpx
-        async with httpx.AsyncClient() as client:
-            results = []
-            for uid in user_ids:
-                resp = await client.post(
-                    "https://oapi.dingtalk.com/topapi/message/corpconversation/asyncsend_v2",
-                    params={"access_token": token},
-                    json={
-                        "agent_id": int(agent_id),
-                        "userid_list": uid,
-                        "msg": {
-                            "msgtype": "markdown",
-                            "markdown": {"title": "培训通知", "text": content}
-                        }
-                    }
-                )
-                results.append(resp.json())
-        return {"results": results}
-
-
-# ========================================================================
-# 飞书连接器
-# ========================================================================
-
-class FeishuConnector(PlatformConnector):
-    """飞书连接器"""
-
-    async def get_tenant_token(self) -> str:
-        import httpx
-        app_id = self.config.get("app_id")
-        app_secret = self.config.get("app_secret")
-        if not app_id or not app_secret:
-            raise ValueError("飞书配置缺失: app_id/app_secret")
-
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
-                json={"app_id": app_id, "app_secret": app_secret}
-            )
-            data = resp.json()
-            if data.get("code") != 0:
-                raise Exception(f"飞书token获取失败: {data}")
-            return data["tenant_access_token"]
-
-    async def get_access_token(self) -> str:
-        return await self.get_tenant_token()
-
-    async def sync_organization(self, db: AsyncSession) -> dict:
-        from app.models.department import Department
-        from app.models.user import User
-        from app.utils.auth import get_password_hash
-        from sqlalchemy import select
-
-        token = await self.get_access_token()
-        stats = {"departments_added": 0, "users_added": 0, "users_updated": 0}
-
-        import httpx
-        async with httpx.AsyncClient() as client:
-            # 1. 获取部门
-            dept_resp = await client.get(
-                "https://open.feishu.cn/open-apis/contact/v3/departments",
-                params={"page_size": 50},
-                headers={"Authorization": f"Bearer {token}"}
-            )
-            dept_data = dept_resp.json()
-            dept_list = dept_data.get("data", {}).get("items", [])
-
-            dept_id_map = {"0": None}
-            for dd in dept_list:
-                dept_id_map[dd.get("open_department_id", dd.get("department_id"))] = None
-
-            # First pass: create departments
-            for dd in dept_list:
-                ext_id = dd.get("open_department_id") or dd.get("department_id")
-                parent_ext_id = dd.get("parent_department_id", "0")
-
-                result = await db.execute(
-                    select(Department).where(Department.name == dd.get("name"))
-                )
-                dept = result.scalar_one_or_none()
-                if not dept:
-                    dept = Department(
-                        name=dd.get("name", "未知"),
-                        parent_id=dept_id_map.get(parent_ext_id),
-                        sort=dd.get("sort", 0),
-                        is_active=True,
-                    )
-                    db.add(dept)
-                    await db.flush()
-                    stats["departments_added"] += 1
-                dept_id_map[ext_id] = dept.id
-
-            # 2. 获取员工
-            page_token = None
-            while True:
-                params = {"page_size": 100}
-                if page_token:
-                    params["page_token"] = page_token
-
-                user_resp = await client.get(
-                    "https://open.feishu.cn/open-apis/contact/v3/users",
-                    params=params,
-                    headers={"Authorization": f"Bearer {token}"}
-                )
-                user_data = user_resp.json()
-                if user_data.get("code") != 0:
-                    break
-
-                user_items = user_data.get("data", {}).get("items", [])
-                for u in user_items:
-                    username = u.get("user_id") or u.get("mobile", "") or u.get("email", "")
-                    if not username:
+            for entry in conn.entries:
+                try:
+                    sam = str(entry.sAMAccountName) if entry.sAMAccountName else ''
+                    if not sam or sam.endswith('$'):  # Skip computer accounts
+                        stats['users_skipped'] += 1
                         continue
+
+                    # Check if disabled
+                    uac = int(entry.userAccountControl.value or 0)
+                    if uac & 2:  # ACCOUNTDISABLE
+                        stats['users_skipped'] += 1
+                        continue
+
+                    username = sam.lower()
+                    realname = str(entry.displayName) if entry.displayName else username
+                    email = str(entry.mail) if entry.mail else f'{username}@cyb-org.cn'
+                    phone = str(entry.mobile) if entry.mobile else None
+                    dept_name = str(entry.department) if entry.department else None
+                    emp_id = str(entry.employeeID) if entry.employeeID else None
+                    user_dn = str(entry.distinguishedName).lower() if entry.distinguishedName else ''
+
+                    # Find department
+                    department_id = None
+                    if dept_name:
+                        # Direct department name match
+                        for dn_key, dept_id in ou_map.items():
+                            if dept_name.lower() in dn_key:
+                                department_id = dept_id
+                                break
+                    if not department_id:
+                        # Parent OU from DN
+                        parent_dn = ','.join(user_dn.split(',')[1:]) if user_dn else ''
+                        department_id = ou_map.get(parent_dn)
+
+                    # Check if user exists
                     result = await db.execute(
-                        select(User).where(User.username == str(username)[:50])
+                        select(User).where(User.username == username)
                     )
                     user = result.scalar_one_or_none()
-                    dept_ids = u.get("department_ids", [])
-                    dept_id = dept_id_map.get(dept_ids[0]) if dept_ids else None
 
                     if user:
-                        user.real_name = u.get("name", user.real_name)
-                        user.email = u.get("email") or user.email
-                        user.phone = u.get("mobile") or user.phone
-                        if dept_id: user.department_id = dept_id
-                        stats["users_updated"] += 1
+                        # Update
+                        user.real_name = realname or user.real_name
+                        user.email = email or user.email
+                        user.phone = phone or user.phone
+                        user.department_id = department_id or user.department_id
+                        user.source = 'ldap'
+                        stats['users_updated'] += 1
                     else:
+                        # Create
                         user = User(
-                            username=str(username)[:50],
-                            real_name=u.get("name", ""),
-                            email=u.get("email"),
-                            phone=u.get("mobile"),
-                            password_hash=get_password_hash("123456"),
-                            role="student",
-                            department_id=dept_id,
+                            username=username,
+                            real_name=realname,
+                            email=email,
+                            phone=phone,
+                            department_id=department_id,
+                            role='student',
+                            password_hash='__ldap__',
+                            source='ldap',
                             is_active=True,
                         )
                         db.add(user)
-                        stats["users_added"] += 1
+                        stats['users_added'] += 1
 
-                has_more = user_data.get("data", {}).get("has_more", False)
-                if not has_more:
-                    break
-                page_token = user_data.get("data", {}).get("page_token")
+                except Exception as e:
+                    stats['errors'].append(f"{getattr(entry, 'sAMAccountName', '?')}: {e}")
+                    stats['users_skipped'] += 1
 
-        return {"platform": "feishu", **stats}
+        finally:
+            conn.unbind()
 
-    async def send_message(self, user_ids: list[str], content: str) -> dict:
-        token = await self.get_access_token()
-        import httpx
-        async with httpx.AsyncClient() as client:
-            results = []
-            for uid in user_ids:
-                resp = await client.post(
-                    "https://open.feishu.cn/open-apis/im/v1/messages",
-                    params={"receive_id_type": "open_id"},
-                    headers={"Authorization": f"Bearer {token}"},
-                    json={
-                        "receive_id": uid,
-                        "msg_type": "text",
-                        "content": json.dumps({"text": content})
-                    }
-                )
-                results.append(resp.json())
-        return {"results": results}
-
-
-# ========================================================================
-# 企业微信连接器
-# ========================================================================
-
-class WeComConnector(PlatformConnector):
-    """企业微信连接器"""
-
-    async def get_access_token(self) -> str:
-        import httpx
-        corp_id = self.config.get("corp_id")
-        corp_secret = self.config.get("corp_secret")
-        if not corp_id or not corp_secret:
-            raise ValueError("企微配置缺失: corp_id/corp_secret")
-
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(
-                "https://qyapi.weixin.qq.com/cgi-bin/gettoken",
-                params={"corpid": corp_id, "corpsecret": corp_secret}
-            )
-            data = resp.json()
-            if data.get("errcode") != 0:
-                raise Exception(f"企微token获取失败: {data}")
-            return data["access_token"]
-
-    async def sync_organization(self, db: AsyncSession) -> dict:
-        from app.models.department import Department
-        from app.models.user import User
-        from app.utils.auth import get_password_hash
-        from sqlalchemy import select
-
-        token = await self.get_access_token()
-        stats = {"departments_added": 0, "users_added": 0, "users_updated": 0}
-
-        import httpx
-        async with httpx.AsyncClient() as client:
-            # 1. 获取部门
-            dept_resp = await client.get(
-                "https://qyapi.weixin.qq.com/cgi-bin/department/list",
-                params={"access_token": token}
-            )
-            dept_data = dept_resp.json()
-
-            dept_id_map = {0: None}
-            for dd in dept_data.get("department", []):
-                ext_id = dd.get("id")
-                parent_ext_id = dd.get("parentid", 0)
-                result = await db.execute(
-                    select(Department).where(Department.name == dd.get("name"))
-                )
-                dept = result.scalar_one_or_none()
-                if not dept:
-                    dept = Department(
-                        name=dd.get("name", "未知"),
-                        parent_id=dept_id_map.get(parent_ext_id),
-                        sort=dd.get("order", 0),
-                        is_active=True,
-                    )
-                    db.add(dept)
-                    await db.flush()
-                    stats["departments_added"] += 1
-                dept_id_map[ext_id] = dept.id
-
-            # 2. 获取员工
-            async def fetch_dept_users(dept_id: int):
-                user_resp = await client.get(
-                    "https://qyapi.weixin.qq.com/cgi-bin/user/list",
-                    params={"access_token": token, "department_id": dept_id, "fetch_child": 1}
-                )
-                return user_resp.json()
-
-            for ext_id, local_id in dept_id_map.items():
-                if ext_id == 0: continue
-                user_data = await fetch_dept_users(ext_id)
-                for u in user_data.get("userlist", []):
-                    username = u.get("userid") or u.get("mobile", "")
-                    if not username:
-                        continue
-                    result = await db.execute(
-                        select(User).where(User.username == username[:50])
-                    )
-                    user = result.scalar_one_or_none()
-                    if user:
-                        user.real_name = u.get("name", user.real_name)
-                        user.email = u.get("email") or user.email
-                        user.phone = u.get("mobile") or user.phone
-                        user.department_id = local_id
-                        stats["users_updated"] += 1
-                    else:
-                        user = User(
-                            username=str(username)[:50],
-                            real_name=u.get("name", ""),
-                            email=u.get("email"),
-                            phone=u.get("mobile"),
-                            password_hash=get_password_hash("123456"),
-                            role="student",
-                            department_id=local_id,
-                            is_active=True,
-                        )
-                        db.add(user)
-                        stats["users_added"] += 1
-
-        return {"platform": "wecom", **stats}
+        return stats
 
     async def send_message(self, user_ids: list[str], content: str) -> dict:
-        token = await self.get_access_token()
-        agent_id = self.config.get("agent_id")
-        if not agent_id:
-            raise ValueError("企微配置缺失: agent_id")
-
-        import httpx
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                "https://qyapi.weixin.qq.com/cgi-bin/message/send",
-                params={"access_token": token},
-                json={
-                    "touser": "|".join(user_ids),
-                    "msgtype": "markdown",
-                    "agentid": int(agent_id),
-                    "markdown": {"content": content}
-                }
-            )
-            return resp.json()
+        """LDAP 不支持消息推送"""
+        return {'error': 'LDAP/AD 不支持消息推送功能'}
 
 
-# ========================================================================
-# 工厂函数
-# ========================================================================
+# ═══════════════ 钉钉连接器 (stub) ═══════════════
 
-PLATFORM_MAP = {
-    "dingtalk": DingTalkConnector,
-    "feishu": FeishuConnector,
-    "wecom": WeComConnector,
-}
+class DingtalkConnector:
+    def __init__(self, config_json):
+        self.config = json.loads(config_json) if isinstance(config_json, str) else config_json
+
+    async def test_connection(self):
+        return (False, '钉钉连接器未实现（需要 AppKey/AppSecret）')
+
+    async def sync_organization(self, db):
+        return {'error': '钉钉同步未实现'}
+
+    async def send_message(self, user_ids, content):
+        return {'error': '钉钉消息推送未实现'}
 
 
-def get_connector(platform: str, config_json: str | dict) -> Optional[PlatformConnector]:
-    """获取平台连接器实例"""
-    cls = PLATFORM_MAP.get(platform)
-    if not cls:
-        return None
-    if isinstance(config_json, str):
-        config = json.loads(config_json) if config_json else {}
-    else:
-        config = config_json or {}
-    return cls(config)
+class FeishuConnector:
+    def __init__(self, config_json):
+        self.config = json.loads(config_json) if isinstance(config_json, str) else config_json
+
+    async def test_connection(self):
+        return (False, '飞书连接器未实现')
+
+    async def sync_organization(self, db):
+        return {'error': '飞书同步未实现'}
+
+    async def send_message(self, user_ids, content):
+        return {'error': '飞书消息推送未实现'}
+
+
+class WecomConnector:
+    def __init__(self, config_json):
+        self.config = json.loads(config_json) if isinstance(config_json, str) else config_json
+
+    async def test_connection(self):
+        return (False, '企业微信连接器未实现')
+
+    async def sync_organization(self, db):
+        return {'error': '企微同步未实现'}
+
+    async def send_message(self, user_ids, content):
+        return {'error': '企微消息推送未实现'}
+
+
+# ═══════════════ 连接器工厂 ═══════════════
+
+def get_connector(platform: str, config_json: str | dict):
+    """根据平台类型返回对应的连接器实例"""
+    connectors = {
+        'ldap': LdapConnector,
+        'dingtalk': DingtalkConnector,
+        'feishu': FeishuConnector,
+        'wecom': WecomConnector,
+    }
+    cls = connectors.get(platform)
+    return cls(config_json) if cls else None

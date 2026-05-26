@@ -2,12 +2,13 @@
 import json
 from typing import Optional
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
 from app.models.enterprise import EnterpriseConfig
 from app.models.user import User
+from app.models.sync_log import SyncLog
 from app.models.task import TrainingTask, TaskAssignment
 from app.utils.auth import get_current_user
 from app.utils.enterprise_connector import get_connector
@@ -26,7 +27,7 @@ class PlatformConfigUpdate(BaseModel):
 
 class SyncRequest(BaseModel):
     """同步请求"""
-    平台: str = Field(..., alias="platform", pattern="^(dingtalk|feishu|wecom)$")
+    平台: str = Field(..., alias="platform", pattern="^(dingtalk|feishu|wecom|ldap)$")
     class Config: populate_by_name = True
 
 class NotifyRequest(BaseModel):
@@ -51,7 +52,7 @@ async def list_enterprise_configs(
     configs = result.scalars().all()
 
     config_list = []
-    platform_names = {"dingtalk": "钉钉", "feishu": "飞书", "wecom": "企业微信"}
+    platform_names = {"dingtalk": "钉钉", "feishu": "飞书", "wecom": "企业微信", "ldap": "LDAP/AD"}
     for c in configs:
         config_dict = {}
         if c.config_json:
@@ -140,6 +141,36 @@ async def update_platform_config(
     return {"message": f"{platform} 配置已保存", "labels": {"message": "消息"}}
 
 
+# ========== 连接测试 ==========
+
+@router.post("/test-connection/{platform}")
+async def test_platform_connection(
+    platform: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """测试平台连接"""
+    if current_user.get("角色") != "admin":
+        raise HTTPException(status_code=403, detail="仅管理员可测试")
+
+    result = await db.execute(
+        select(EnterpriseConfig).where(EnterpriseConfig.platform == platform)
+    )
+    config = result.scalar_one_or_none()
+    if not config or not config.config_json:
+        raise HTTPException(status_code=400, detail="请先保存配置")
+
+    connector = get_connector(platform, config.config_json)
+    if not connector:
+        raise HTTPException(status_code=400, detail=f"不支持的平台: {platform}")
+
+    try:
+        success, message = await connector.test_connection()
+        return {"success": success, "message": message, "labels": {"message": "消息"}}
+    except Exception as e:
+        return {"success": False, "message": str(e), "labels": {"message": "消息"}}
+
+
 # ========== 组织同步 ==========
 
 @router.post("/sync")
@@ -165,6 +196,19 @@ async def sync_organization(
 
     try:
         stats = await connector.sync_organization(db)
+        
+        # 记录同步日志
+        log = SyncLog(
+            platform=req.平台,
+            status="success" if not stats.get("error") else "error",
+            ous_synced=stats.get("ous_synced", 0),
+            users_added=stats.get("users_added", 0),
+            users_updated=stats.get("users_updated", 0),
+            users_skipped=stats.get("users_skipped", 0),
+            errors=json.dumps(stats.get("errors", []), ensure_ascii=False),
+            operator=current_user.get("用户名", "unknown"),
+        )
+        db.add(log)
         await db.commit()
         return {
             "message": "同步完成",
@@ -174,6 +218,56 @@ async def sync_organization(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"同步失败: {str(e)}")
+
+
+# ========== 同步日志 ==========
+
+@router.get("/sync-logs")
+async def get_sync_logs(
+    platform: str = Query(None, alias="platform"),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """获取同步历史日志"""
+    if current_user.get("角色") != "admin":
+        raise HTTPException(status_code=403, detail="仅管理员可查看")
+
+    query = select(SyncLog).order_by(SyncLog.created_at.desc())
+    if platform:
+        query = query.where(SyncLog.platform == platform)
+    query = query.limit(limit)
+
+    result = await db.execute(query)
+    logs = result.scalars().all()
+
+    log_list = []
+    for l in logs:
+        errors_list = []
+        if l.errors:
+            try:
+                errors_list = json.loads(l.errors)
+            except (json.JSONDecodeError, TypeError):
+                errors_list = [l.errors]
+
+        log_list.append({
+            "ID": l.id,
+            "平台": l.platform,
+            "状态": l.status,
+            "部门数": l.ous_synced,
+            "新增用户": l.users_added,
+            "更新用户": l.users_updated,
+            "跳过用户": l.users_skipped,
+            "错误": errors_list,
+            "操作人": l.operator,
+            "时间": str(l.created_at),
+        })
+
+    return {
+        "数据": log_list,
+        "共计": len(log_list),
+        "labels": {"数据": "data", "共计": "total"},
+    }
 
 
 # ========== 消息通知 ==========

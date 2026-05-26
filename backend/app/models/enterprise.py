@@ -9,7 +9,7 @@ class EnterpriseConfig(Base):
     __tablename__ = "enterprise_configs"
 
     id = Column(Integer, primary_key=True, index=True)
-    platform = Column(String(20), nullable=False, comment="平台: dingtalk/feishu/wecom")
+    platform = Column(String(20), nullable=False, comment="平台: dingtalk/feishu/wecom/ldap")
     is_enabled = Column(Boolean, default=False, comment="是否启用")
     config_json = Column(Text, nullable=True, comment="配置JSON(AppKey/Secret/AgentId等)")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

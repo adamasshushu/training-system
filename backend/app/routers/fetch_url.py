@@ -1,4 +1,7 @@
 """网址抓取路由：将URL内容保存为HTML本地副本"""
+import ipaddress
+import socket
+from urllib.parse import urlparse
 import httpx
 from bs4 import BeautifulSoup
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,6 +15,67 @@ from app.utils.auth import get_current_user
 from app.utils.storage import get_storage
 
 router = APIRouter(prefix="/api/fetch-url", tags=["网址抓取"])
+
+# 禁止访问的内网IP范围
+BLOCKED_NETWORKS = [
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("::1/128"),
+]
+
+BLOCKED_SCHEMES = {"file", "ftp"}
+
+
+def validate_url(url: str) -> None:
+    """验证URL安全性：阻止内网IP和危险协议"""
+    parsed = urlparse(url)
+
+    # 阻止危险协议
+    if parsed.scheme in BLOCKED_SCHEMES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不允许使用 {parsed.scheme}:// 协议",
+        )
+
+    # 只允许 http/https
+    if parsed.scheme not in ("http", "https"):
+        raise HTTPException(status_code=400, detail="仅支持 http/https 协议")
+
+    hostname = parsed.hostname
+    if not hostname:
+        raise HTTPException(status_code=400, detail="URL 中缺少主机名")
+
+    # 解析主机名为IP地址
+    try:
+        addr = ipaddress.ip_address(hostname)
+    except ValueError:
+        # 可能是域名，需要DNS解析
+        try:
+            resolved_ips = socket.getaddrinfo(hostname, None)
+        except socket.gaierror:
+            raise HTTPException(status_code=400, detail=f"无法解析域名: {hostname}")
+        for res in resolved_ips:
+            ip_str = res[4][0]
+            try:
+                addr = ipaddress.ip_address(ip_str)
+            except ValueError:
+                continue
+            if any(addr in net for net in BLOCKED_NETWORKS):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"禁止访问内网地址: {ip_str}",
+                )
+        return  # 域名解析后无内网IP，放行
+
+    # 直接是IP地址，检查是否在内网范围
+    if any(addr in net for net in BLOCKED_NETWORKS):
+        raise HTTPException(
+            status_code=400,
+            detail=f"禁止访问内网地址: {hostname}",
+        )
 
 
 class FetchUrlRequest(BaseModel):
@@ -32,6 +96,9 @@ async def fetch_url(
     """抓取网页HTML并保存到本地"""
     if current_user.get("角色") not in ("admin", "teacher"):
         raise HTTPException(status_code=403, detail="无权限")
+
+    # 验证URL安全性（防SSRF）
+    validate_url(req.url)
 
     # 获取网页内容
     try:
